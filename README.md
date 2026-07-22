@@ -51,14 +51,23 @@ The system is honest about what it is: a *reference system with a triage layer*,
 
 ## Setup
 
-**Requirements:** [Claude Code](https://claude.com/claude-code), Python + `pip install yt-dlp faster-whisper`, [ffmpeg](https://ffmpeg.org), an [Obsidian](https://obsidian.md) vault (a folder of markdown — no plugins needed).
+**Requirements:** [Claude Code](https://claude.com/claude-code) and Python. That's the whole list — everything else installs itself when first needed.
 
 1. Copy the two folders from `skills/` into `~/.claude/skills/`.
-2. Edit `skills/obsidian-vault/SKILL.md` — set the vault path to your vault.
-3. Create an **unlisted** YouTube playlist (e.g. "AI Queue"). Unlisted means yt-dlp can read it with zero authentication — no cookies, no API keys, your account never touched.
-4. Create a private **Telegram bot** (message @BotFather → `/newbot`) — this is the universal inbox: from Instagram, YouTube, or any app, Share → Telegram → your bot. Reels get transcribed locally with Whisper (their frames + caption too). No account is ever logged into by automation; your only gesture is Share.
-5. Copy `skills/argus/config.example.json` to `config.local.json` beside it; fill in the playlist URL and bot token. It's gitignored — never commit it.
-6. Save things as you scroll. Then:
+2. In Claude Code, paste any YouTube link:
+
+```
+/argus <url>
+```
+
+That's the entire setup. On first run Argus configures *itself*: it finds your Obsidian vault by reading Obsidian's own config (or offers to create a folder vault if you don't use Obsidian), scaffolds the note structure, and installs yt-dlp — asking you at most two questions. **The installer is also an AI agent; there is no step 3.**
+
+Everything else is lazy — each piece sets itself up the first time you actually want it:
+
+- First tutorial → it installs ffmpeg (with your OK) for the frame pass.
+- First `/argus queue` → it walks you through creating an **unlisted** YouTube playlist (readable with zero login — no cookies, no API keys, your account never touched), and optionally a private **Telegram bot** (@BotFather, one minute): from then on, Share → Telegram → your bot files reels and videos from any app.
+- First Instagram reel → it installs faster-whisper and transcribes the audio locally.
+- First drain → it builds your phone dashboard and gives you its private URL.
 
 ```
 /argus <url>            # watch one video/reel now

@@ -5,7 +5,7 @@ description: Search, create, and organize notes in the Obsidian vault. Use when 
 
 # Obsidian Vault
 
-Vault: `<PATH-TO-YOUR-OBSIDIAN-VAULT>`
+Vault: the `vault_path` in `~/.claude/argus.config.json` (missing → the argus skill's SETUP.md first-run flow creates it).
 
 Plain markdown, zero plugins, no embeddings. Retrieval is Grep + wikilinks (Karpathy LLM-wiki style).
 

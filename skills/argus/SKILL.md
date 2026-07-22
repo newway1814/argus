@@ -9,7 +9,7 @@ The hundred-eyed watchman: watches so the user doesn't have to, and files everyt
 
 Usage: `/argus <url>` · `/argus <url> --frames` (force the frame pass) · `/argus queue`
 
-Instance config (playlist URL, Telegram token, dashboard URL) lives in `config.local.json` beside this file. **Never commit it or echo the token.**
+Instance config (vault path, playlist URL, Telegram token, dashboard URL) lives at `~/.claude/argus.config.json`. **Never commit it or echo the token.** Config missing, or a needed piece empty? Follow [SETUP.md](SETUP.md) — Argus sets itself up in-line and keeps going; it never sends the user to a docs page.
 
 Download into the scratchpad only; delete media once the note is written. Add `--js-runtimes node` to every yt-dlp call.
 

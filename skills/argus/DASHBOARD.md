@@ -9,6 +9,6 @@ The dashboard is the phone-side face of the vault: one glanceable page, republis
    3. **Awaiting eyeballs** — `watch`/`skim` items with their minute-ranges.
    4. **State of the brain** — counts, trending topics/tools across recent runs, last-drain time, any fetch failures.
    Phone-first: single column, large tap targets, verdict badges color-coded, both themes supported. No search box, no nav, no inbox.
-3. Publish: load the `artifact-design` skill first if this session hasn't, then call Artifact with `file_path: <vault>/_dashboard.html`, favicon `👁️`, and `url:` = `dashboard_url` from `config.local.json` so the URL never changes. First publish ever: omit `url`, then store the minted URL into `dashboard_url`.
+3. Publish: load the `artifact-design` skill first if this session hasn't, then call Artifact with `file_path: <vault>/_dashboard.html`, favicon `👁️`, and `url:` = `dashboard_url` from `~/.claude/argus.config.json` so the URL never changes. First publish ever: omit `url`, then store the minted URL into `dashboard_url`.
 
 Done when the Artifact republish succeeds and the URL in config still matches.
