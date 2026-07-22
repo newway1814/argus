@@ -66,13 +66,16 @@ The system is honest about what it is: a *reference system with a triage layer*,
 
 The vault teaches itself: open `Welcome.md`, click `Digest`, follow the links.
 
+> **Note:** for the author's machine, the installed copies in `~/.claude/skills/` are canonical — this repo is the distributable, synced after changes.
+
 ## Anatomy
 
 ```
 skills/
   argus/
-    SKILL.md       # the pipeline: ledger → transcript → tier decision → note → cross-links → digest
-    FRAMES.md      # the frame pass: scene detection, timestamp alignment, gradual-screen stills
+    SKILL.md             # the pipeline: ledger → transcript → tier decision → note → cross-links → digest
+    FRAMES.md            # the frame pass: scene detection, timestamp alignment, blind-spot stills
+    clean_transcript.py  # collapses rolling auto-caption SRT into clean [m:ss] lines (~5-10x fewer tokens)
   obsidian-vault/
     SKILL.md       # vault path, conventions (MOCs, dossiers, frontmatter), retrieval workflow
 ```

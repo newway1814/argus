@@ -5,7 +5,7 @@ description: Search, create, and organize notes in the Obsidian vault. Use when 
 
 # Obsidian Vault
 
-Vault: `<PATH-TO-YOUR-OBSIDIAN-VAULT>`  ← edit this to your vault's absolute path
+Vault: `<PATH-TO-YOUR-OBSIDIAN-VAULT>`
 
 Plain markdown, zero plugins, no embeddings. Retrieval is Grep + wikilinks (Karpathy LLM-wiki style).
 
@@ -13,7 +13,7 @@ Plain markdown, zero plugins, no embeddings. Retrieval is Grep + wikilinks (Karp
 
 | Path | Holds |
 |---|---|
-| `Digest.md` | Front page. Processing runs, newest first, above the fold. |
+| `Digest.md` | Front page. Last 10 processing runs, newest first; older runs live in `Digest Archive.md`. |
 | `videos/` | One note per YouTube video (written by the argus skill). |
 | `topics/` | MOC index notes, one per discipline (e.g. `AI Agents.md`). A video is linked from every topic it touches. |
 | `tools/` | One dossier per tool/project, appended each time a new video mentions it. |
@@ -26,6 +26,8 @@ Plain markdown, zero plugins, no embeddings. Retrieval is Grep + wikilinks (Karp
 - Every note carries YAML frontmatter with `tags`; video notes add `type` (tutorial | news | explainer | opinion) and `watch-verdict` (skip | skim | watch).
 - Topic MOCs are grouped link lists — `- [[note]] — one-line hook`. Create a new MOC when ≥2 notes share a theme no existing MOC covers; also add the new MOC line to `Welcome.md`.
 - Tool dossiers: one line on what it is, official link, then one bullet per video: `- [[video note]] — what it said`.
+- **Dossier bar:** a tool earns a page only if it's worth remembering — AI tooling, new or obscure projects, things the user might later half-recall ("some video mentioned a thing that…"). Household names (React, Next.js, Docker, …) stay inline as plain text.
+- Wikilinks resolve by filename vault-wide: a name may exist in `topics/` **or** `tools/`, never both.
 
 ## Retrieval — "have I watched anything about X?"
 
