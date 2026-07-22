@@ -18,12 +18,16 @@ Plain markdown, zero plugins, no embeddings. Retrieval is Grep + wikilinks (Karp
 | `topics/` | MOC index notes, one per discipline (e.g. `AI Agents.md`). A video is linked from every topic it touches. |
 | `tools/` | One dossier per tool/project, appended each time a new video mentions it. |
 | `videos/_processed.txt` | Ledger of processed video IDs, one per line. |
+| `Try Queue.md` | Workflows saved but not yet tried. One **weekly pick** at top; sections: Untried / Tried / Dismissed. |
+| `_dashboard.html` | Generated phone dashboard (argus skill rebuilds it; never edit by hand). |
 
 ## Conventions
 
 - `[[wikilinks]]` everywhere; Title Case filenames.
 - Video notes are named `YYYY-MM-DD - <Title>.md` (published date).
-- Every note carries YAML frontmatter with `tags`; video notes add `type` (tutorial | news | explainer | opinion) and `watch-verdict` (skip | skim | watch).
+- Every note carries YAML frontmatter with `tags`; video notes add `type` (tutorial | news | explainer | opinion | workflow) and `watch-verdict` (skip | skim | watch | try).
+- `try` notes get a line in `Try Queue.md` (Untried section): `- [[note]] — what the workflow does · setup cost`. The weekly pick rotates when older than 7 days: current pick moves back to Untried (or Tried/Dismissed per the user), the oldest Untried item becomes the pick.
+- **Mid-task surfacing:** when the user's current work matches a `try` note's workflow, mention it — "you saved a reel about exactly this" — and on their say-so move it to Tried.
 - Topic MOCs are grouped link lists — `- [[note]] — one-line hook`. Create a new MOC when ≥2 notes share a theme no existing MOC covers; also add the new MOC line to `Welcome.md`.
 - Tool dossiers: one line on what it is, official link, then one bullet per video: `- [[video note]] — what it said`.
 - **Dossier bar:** a tool earns a page only if it's worth remembering — AI tooling, new or obscure projects, things the user might later half-recall ("some video mentioned a thing that…"). Household names (React, Next.js, Docker, …) stay inline as plain text.

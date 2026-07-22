@@ -51,18 +51,22 @@ The system is honest about what it is: a *reference system with a triage layer*,
 
 ## Setup
 
-**Requirements:** [Claude Code](https://claude.com/claude-code), Python + `pip install yt-dlp`, [ffmpeg](https://ffmpeg.org), an [Obsidian](https://obsidian.md) vault (a folder of markdown — no plugins needed).
+**Requirements:** [Claude Code](https://claude.com/claude-code), Python + `pip install yt-dlp faster-whisper`, [ffmpeg](https://ffmpeg.org), an [Obsidian](https://obsidian.md) vault (a folder of markdown — no plugins needed).
 
 1. Copy the two folders from `skills/` into `~/.claude/skills/`.
 2. Edit `skills/obsidian-vault/SKILL.md` — set the vault path to your vault.
-3. Create an **unlisted** YouTube playlist (e.g. "AI Queue"). Paste its URL into `skills/argus/SKILL.md` where marked. Unlisted means yt-dlp can read it with zero authentication — no cookies, no API keys, your account never touched.
-4. Save videos to the playlist as you scroll. Then:
+3. Create an **unlisted** YouTube playlist (e.g. "AI Queue"). Unlisted means yt-dlp can read it with zero authentication — no cookies, no API keys, your account never touched.
+4. Create a private **Telegram bot** (message @BotFather → `/newbot`) — this is the universal inbox: from Instagram, YouTube, or any app, Share → Telegram → your bot. Reels get transcribed locally with Whisper (their frames + caption too). No account is ever logged into by automation; your only gesture is Share.
+5. Copy `skills/argus/config.example.json` to `config.local.json` beside it; fill in the playlist URL and bot token. It's gitignored — never commit it.
+6. Save things as you scroll. Then:
 
 ```
-/argus <url>            # watch one video now
+/argus <url>            # watch one video/reel now
 /argus <url> --frames   # force the frame pass
-/argus queue            # drain the playlist
+/argus queue            # drain playlist + Telegram inbox, rebuild the dashboard
 ```
+
+Each drain also rebuilds a **phone dashboard** (published as a private Claude Artifact at a stable URL): this week's workflow to try, fresh notes, what's worth actually watching, and the state of the brain. Workflow-type content gets a `try` verdict and enters a **Try Queue** — one nominated experiment per week, so saved reels stop dying in the graveyard.
 
 The vault teaches itself: open `Welcome.md`, click `Digest`, follow the links.
 
