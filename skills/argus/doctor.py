@@ -241,11 +241,12 @@ def windows_acl_is_secure(path):
     executable = powershell_path()
     if not executable:
         return False
+    literal_path = str(path).replace("'", "''")
     script = (
         "$current=[System.Security.Principal.WindowsIdentity]::"
         "GetCurrent().User.Value; "
         'Write-Output \"CURRENT|$current|\"; '
-        "(Get-Acl -LiteralPath $args[0]).Access | ForEach-Object { "
+        f"(Get-Acl -LiteralPath '{literal_path}').Access | ForEach-Object {{ "
         "$sid=$_.IdentityReference.Translate("
         "[System.Security.Principal.SecurityIdentifier]).Value; "
         'Write-Output \"$sid|$($_.FileSystemRights)|$($_.AccessControlType)\"'
@@ -259,7 +260,6 @@ def windows_acl_is_secure(path):
                 "-NonInteractive",
                 "-Command",
                 script,
-                str(path),
             ],
             text=True,
             capture_output=True,
