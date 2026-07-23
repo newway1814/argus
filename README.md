@@ -29,6 +29,14 @@ Argus watches everything you saved, writes a note per item, messages you a diges
 /argus <url>
 ```
 
+Before the first real video, or whenever the machine changes, run:
+
+```
+/argus doctor
+```
+
+Doctor is a read-only preflight. It reports the exact configured Python interpreter, tool versions, model-cache state, config safety, vault writability, and the health of captions, transcription, frames, vault writing, queue, and Telegram. It prints preparation commands but never runs them.
+
 ## What a note contains
 
 Every watched item becomes a retrieval-grade note, not a summary:
@@ -117,6 +125,7 @@ skills/
     extract_frames.py    # single-decode scene scoring: burst collapse, budget cap, gap report
     clean_transcript.py  # collapses rolling auto-caption SRT into clean [m:ss] lines (~5-10x fewer tokens)
     transcribe_audio.py  # local faster-whisper transcription for reels and caption-less videos
+    doctor.py            # read-only runtime and capability preflight
   argus-vault/
     SKILL.md             # vault conventions (MOCs, dossiers, Try Queue) + the retrieval workflow
 ```

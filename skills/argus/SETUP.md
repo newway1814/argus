@@ -30,13 +30,19 @@ The token lives here and nowhere else, `telegram.py` reads it directly, so it ne
 3. **Scaffold what's missing, never overwrite:** `videos/`, `topics/`, `tools/`, `Digest.md`, `Try Queue.md`, and a `Welcome.md` home note (skip if one exists).
 4. **Check yt-dlp** (`yt-dlp --version`). Missing → explain that Argus cannot fetch the video or captions, give one preparation command appropriate to the user's OS, and stop the requested run. Do not run the command. Do not mark setup or the video request successful.
 5. **Check Node** (`node --version`), yt-dlp uses it to solve YouTube's player JS. Missing → don't block: say the one-liner (`winget install OpenJS.NodeJS.LTS` / `brew install node` / distro package), drop `--js-runtimes node` from calls, and proceed; if fetches then act flaky, remind them why.
-6. **Resolve Python once and record it as `python_cmd`.** A machine usually has several interpreters, and "newest" is the wrong tie-breaker, the freshest one is the least likely to carry the dependencies. Pick by capability instead:
+6. **Resolve a Python candidate, but do not record it yet.** A machine usually has several interpreters, and "newest" is the wrong tie-breaker, the freshest one is the least likely to carry the dependencies. Pick by capability instead:
    - **Collect candidates.** `py -3`, `python3`, `python`, each with `--version`; keep those reporting 3.9 or newer. On Windows a usable runtime frequently exists while neither `python` nor `py` is on PATH, so also glob `%LOCALAPPDATA%\Programs\Python\Python3*\python.exe` and keep the absolute paths.
    - **Prefer one that already has the heavy dependency.** Run `<candidate> -c "import faster_whisper"` down the list and take the first that succeeds. Choosing on version alone picks, say, a 3.14 that has nothing installed over the 3.12 that has everything, and the mistake stays invisible until the first reel dies mid-drain.
    - **Nothing imports it?** Take the first ≥3.9 candidate for the core bundled scripts. Record that local transcription is unavailable. Do not install faster-whisper.
 
-   Every bundled script is then called as `<python_cmd> "${CLAUDE_SKILL_DIR}/<script>.py"`. No candidate at all → give one Python preparation command for the user's OS and stop. The serializer cannot write a valid Argus note without Python, so do not pretend captions or metadata alone completed the request.
-7. Write the config, then continue with the URL the user gave using only verified capabilities. Total user-facing cost after prerequisites are ready: at most two questions.
+   No candidate at all → give one Python preparation command for the user's OS and stop. The serializer cannot write a valid Argus note without Python, so do not pretend captions or metadata alone completed the request.
+7. **Write the provisional config with `python_cmd` empty.** Write all other detected and chosen values, then secure the file as described above. This is an explicit setup action, not part of doctor.
+8. **Run doctor against the candidate before recording it:**
+   ```
+   <candidate command> "${CLAUDE_SKILL_DIR}/doctor.py" --config <config_path> --python "<candidate command>"
+   ```
+   This is read-only. It prints both the candidate and its resolved `sys.executable`. A nonzero exit means a required component is unhealthy: give the printed preparation command, leave `python_cmd` empty, and do not claim setup passed.
+9. **Only after doctor exits zero, write the printed absolute `resolved` path to `python_cmd`.** Every bundled script is then called as `<python_cmd> "${CLAUDE_SKILL_DIR}/<script>.py"`. Continue with the URL the user gave using only the capabilities doctor reported ready. Total user-facing cost after prerequisites are ready: at most two questions.
 
 ## Lazy pieces, set up only when first needed
 
