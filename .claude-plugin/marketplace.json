@@ -1,0 +1,21 @@
+{
+  "name": "argus",
+  "owner": {
+    "name": "newway1814",
+    "url": "https://github.com/newway1814"
+  },
+  "metadata": {
+    "description": "Argus — the hundred-eyed watcher. Watches YouTube videos and Instagram reels for you and files runbooks into a searchable vault.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "argus",
+      "source": "./",
+      "description": "Watch YouTube videos and Instagram reels — transcript, on-screen frames, and audio — and turn them into runbooks in a searchable Obsidian vault. Save in 2 taps on your phone, process with one command.",
+      "version": "1.0.0",
+      "author": { "name": "newway1814" },
+      "keywords": ["youtube", "instagram", "notes", "obsidian", "second-brain", "yt-dlp"]
+    }
+  ]
+}

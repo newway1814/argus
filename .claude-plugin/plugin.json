@@ -1,0 +1,13 @@
+{
+  "name": "argus",
+  "description": "Watch YouTube videos and Instagram reels — transcript, on-screen frames, and audio — and turn them into runbooks in a searchable Obsidian vault. Save in 2 taps on your phone, process with one command.",
+  "version": "1.0.0",
+  "author": {
+    "name": "newway1814",
+    "url": "https://github.com/newway1814"
+  },
+  "homepage": "https://github.com/newway1814/argus",
+  "repository": "https://github.com/newway1814/argus",
+  "license": "MIT",
+  "keywords": ["youtube", "instagram", "notes", "obsidian", "second-brain", "yt-dlp"]
+}

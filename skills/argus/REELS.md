@@ -19,7 +19,7 @@ Reels carry their payload three ways at once: speech, burned-in text overlays, a
    Frame N sits at (N-1)×2 seconds. Read every frame beside the speech at its timestamp; transcribe overlays, prompts, commands, and app names exactly.
 4. Write the note like any video (template in SKILL.md), plus:
    - `source: instagram` (or `youtube-shorts`) in frontmatter.
-   - Reels showing a usable workflow get `watch-verdict: try` and an entry in the vault's `Try Queue.md` (see obsidian-vault conventions).
+   - Reels showing a usable workflow get `watch-verdict: try` and an entry in the vault's `Try Queue.md` (see argus-vault conventions).
    - If the user attached a comment when sharing to the bot, quote it in the note under `## Why saved`.
 
 Done when the note's runbook quotes what the reel *showed*, not just what it said — overlays included.
