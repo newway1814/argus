@@ -24,10 +24,6 @@ PLATFORM_POLICIES = {
         "vault_create": 'mkdir -p "{path}"',
     },
     "linux": {
-        "python": "sudo apt-get install -y python3",
-        "yt-dlp": "sudo apt-get install -y yt-dlp",
-        "node": "sudo apt-get install -y nodejs",
-        "frames": "sudo apt-get install -y ffmpeg",
         "vault_create": 'mkdir -p "{path}"',
     },
     "windows": {
