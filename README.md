@@ -1,6 +1,6 @@
 # Argus 👁️
 
-**See it → 2 taps → forget it.** Argus is a [Claude Code](https://claude.com/claude-code) plugin that *watches* YouTube videos and Instagram reels for you — transcript **and** on-screen frames — and turns them into **runbooks**: the exact commands, configs, and steps, reproducible without ever pressing play. Everything files into a plain-markdown vault you can query forever.
+**See it → 2 taps → forget it.** Argus is a [Claude Code](https://claude.com/claude-code) plugin that *watches* YouTube videos and Instagram reels for you, transcript **and** on-screen frames, and turns them into **runbooks**: the exact commands, configs, and steps, reproducible without ever pressing play. Everything files into a plain-markdown vault you can query forever.
 
 Named after Argus Panoptes, the watchman of Greek myth whose hundred eyes never all slept at once.
 
@@ -8,7 +8,7 @@ Named after Argus Panoptes, the watchman of Greek myth whose hundred eyes never 
 
 Staying current with AI means watching YouTube: tutorials, workflow demos, news breakdowns. Forty videos a month is ~13 hours of watching. Realistically you watch a handful, feel guilty about the rest, and three months later you can't remember which video showed the exact config you now desperately need. Your saved reels? A graveyard you never reopen.
 
-And summarizer tools can't fix this, because they read the transcript and stop — but in tutorials the payload is *on the screen*: the command typed, the config pasted, the menu clicked. The speaker just says "then you paste this in." **The transcript never contains *this*.** Argus reads the frames beside the words spoken at each timestamp — that's the difference.
+And summarizer tools can't fix this, because they read the transcript and stop, but in tutorials the payload is *on the screen*: the command typed, the config pasted, the menu clicked. The speaker just says "then you paste this in." **The transcript never contains *this*.** Argus reads the frames beside the words spoken at each timestamp, that's the difference.
 
 ## The 10-second pitch
 
@@ -34,20 +34,30 @@ Argus watches everything you saved, writes a note per item, messages you a diges
 Every watched item becomes a retrieval-grade note, not a summary:
 
 - a 3-sentence **TL;DR**
-- a **runbook** — numbered steps with the *exact* commands, config, and UI paths read off the frames, reproducible without watching
-- **prerequisites** and **outdated flags** (AI tutorials rot in weeks — Argus says so)
+- a **runbook**, numbered steps with the *exact* commands, config, and UI paths read off the frames, reproducible without watching
+- **prerequisites** and **outdated flags** (AI tutorials rot in weeks, Argus says so)
 - deep-linked timestamps (`?t=862`) so "pull up the video" means landing at 14:22, not scrubbing from 0:00
-- a **watch-verdict**: `skip` / `skim` / `watch` / `try` — `watch` is rare and comes with exact minute ranges; workflows worth attempting land in a **Try Queue** with one nominated experiment per week
+- a **watch-verdict**: `skip` / `skim` / `watch` / `try`, `watch` is rare and comes with exact minute ranges; workflows worth attempting land in a **Try Queue** with one nominated experiment per week
 - **cross-links**: topic index notes, and per-tool **dossier pages** that automatically accumulate what every video ever said about LangGraph, Firecrawl, whatever
 
-## Install — two commands, inside Claude Code
+## Install, two commands, inside Claude Code
 
 ```
 /plugin marketplace add newway1814/argus
 /plugin install argus@argus
 ```
 
-**Requirements: Claude Code, Python 3.9+, and Node.** Everything else installs itself the first time it's needed.
+### One-time prerequisites
+
+Argus uses tools that **you prepare and own**. It does not create a private Python environment or install packages during a video run.
+
+| Capability | Prepare once |
+|---|---|
+| Core video fetching and note writing | Claude Code, Python 3.9+, `yt-dlp`, and Node |
+| On-screen frame reading | `ffmpeg` and `ffprobe` |
+| Reels and caption-less videos | `faster-whisper` in the Python environment Argus will use |
+
+These tools are checked before their capability is used. If an optional tool is missing, Argus names what is unavailable and produces an honest degraded note where possible.
 
 Then paste any link:
 
@@ -55,42 +65,44 @@ Then paste any link:
 /argus <url>
 ```
 
-On first run Argus configures *itself*, in the same conversation: it finds your Obsidian vault by reading Obsidian's own config (or creates a plain markdown folder if you don't use Obsidian), scaffolds the note structure, and installs yt-dlp. **At most two questions, zero terminal detours — anything beyond that is a bug, please file an issue.**
+On first run Argus configures its own files in the same conversation: it finds your Obsidian vault by reading Obsidian's config (or creates a plain markdown folder if you do not use Obsidian) and scaffolds the note structure. It never installs or upgrades system packages.
+
+**The promise: one-time prerequisites, then paste links and let Argus handle the rest.** Once the prerequisites are ready, normal watching requires at most two setup questions and no terminal detours.
 
 <details>
 <summary>Manual install (no plugin system)</summary>
 
-Copy both folders from `skills/` into `~/.claude/skills/` — you need **both**: `argus` (the watcher) and `argus-vault` (the vault conventions and retrieval).
+Copy both folders from `skills/` into `~/.claude/skills/`, you need **both**: `argus` (the watcher) and `argus-vault` (the vault conventions and retrieval).
 
 </details>
 
 ## The three levels
 
-Each level is opt-in and sets itself up in chat the first time you reach for it. Level 1 is a complete product on its own.
+Each level is opt-in and configures its own Argus state in chat the first time you reach for it. External prerequisites remain user-managed. Level 1 is a complete product on its own.
 
-**Level 1 — paste a link.** `/argus <url>`. First tutorial triggers a one-time ffmpeg install (with your OK) for the frame pass; first reel installs faster-whisper for local audio transcription.
+**Level 1, paste a link.** `/argus <url>`. Tutorials use ffmpeg for the frame pass when it is available. Reels and caption-less videos use faster-whisper when it is available in the configured Python environment.
 
-**Level 2 — the YouTube queue.** First `/argus queue` walks you through creating an **unlisted** playlist (readable with zero login — no cookies, no API keys, your account never touched). From then on, saving a video is two taps and draining is one command.
+**Level 2, the YouTube queue.** First `/argus queue` walks you through creating an **unlisted** playlist (readable with zero login, no cookies, no API keys, your account never touched). From then on, saving a video is two taps and draining is one command.
 
-**Level 3 — the Telegram inbox + digest.** Optional, one minute with @BotFather. Your bot becomes a universal inbox — **Share → Telegram → bot, from any app** (this is what catches Instagram reels) — *and* an outbox: after every drain it messages you a digest — what was watched, this week's experiment to try, and the few minutes worth actual eyeballs. Setup pairs the bot to you with a one-time code, so nobody who stumbles onto it can feed your queue, and the token is only ever read by the helper that makes the call — it never reaches a command line or a log. One honest limit: Telegram itself holds unread shares for **24 hours**, so drain about daily. Everything drained is kept permanently in the vault, before Telegram is allowed to forget it.
+**Level 3, the Telegram inbox + digest.** Optional, one minute with @BotFather. Your bot becomes a universal inbox, **Share → Telegram → bot, from any app** (this is what catches Instagram reels), *and* an outbox: after every drain it messages you a digest, what was watched, this week's experiment to try, and the few minutes worth actual eyeballs. Setup pairs the bot to you with a one-time code, so nobody who stumbles onto it can feed your queue, and the token is only ever read by the helper that makes the call, it never reaches a command line or a log. One honest limit: Telegram itself holds unread shares for **24 hours**, so drain about daily. Everything drained is kept permanently in the vault, before Telegram is allowed to forget it.
 
-## The payoff — retrieval
+## The payoff, retrieval
 
 Weeks later you hit a wall and ask, in any Claude Code session:
 
 > "have I watched anything about MCP tool permissions?"
 
-The `argus-vault` skill greps the vault — tool dossiers first, then topics, then videos — and answers **from your notes**, citing the exact note and timestamp. No embeddings, no vector database, no RAG pipeline: plain markdown, wikilinks, and text search (the [Karpathy LLM-wiki](https://github.com/green-dalii/obsidian-llm-wiki) philosophy). At personal scale, a well-linked folder of text beats a vector store on every axis — and any agent can read it.
+The `argus-vault` skill greps the vault, tool dossiers first, then topics, then videos, and answers **from your notes**, citing the exact note and timestamp. No embeddings, no vector database, no RAG pipeline: plain markdown, wikilinks, and text search (the [Karpathy LLM-wiki](https://github.com/green-dalii/obsidian-llm-wiki) philosophy). At personal scale, a well-linked folder of text beats a vector store on every axis, and any agent can read it.
 
-The system is honest about what it is: a *reference system with a triage layer*, not a magic learning machine. The agent watches everything; you learn at the moment of need — which is when learning sticks anyway.
+The system is honest about what it is: a *reference system with a triage layer*, not a magic learning machine. The agent watches everything; you learn at the moment of need, which is when learning sticks anyway.
 
-## Costs and conduct — stated plainly
+## Costs and conduct, stated plainly
 
-**Tokens.** Tier 1 (transcript-only) is cheap. The frame pass reads 30–80 frames and costs roughly a long Claude Code session per tutorial; the frame budget is hard-capped at 80 regardless of video length, and videos over 60 minutes stay transcript-only unless you force `--frames`. Anything over ~90 minutes stops and asks first — it tells you the cost and offers to process by the video's own chapters (one note, a section per chapter), because a marathon lecture is a season, not an episode. Drain a big queue on a day you're not racing your usage limits.
+**Tokens.** Tier 1 (transcript-only) is cheap. The frame pass reads 30–80 frames and costs roughly a long Claude Code session per tutorial; the frame budget is hard-capped at 80 regardless of video length, and videos over 60 minutes stay transcript-only unless you force `--frames`. Anything over ~90 minutes stops and asks first, it tells you the cost and offers to process by the video's own chapters (one note, a section per chapter), because a marathon lecture is a season, not an episode. Drain a big queue on a day you're not racing your usage limits.
 
-**Fetching.** Argus is a personal-use tool built for respectful fetching *by design*: it downloads anonymously, never uses your cookies or login, never retries blocked content with credentials, and the queue works off an unlisted playlist precisely so your account is never touched. That last one is enforced, not merely intended: every fetch passes `--ignore-config`, so your own yt-dlp settings cannot quietly attach cookies, credentials, or postprocessors Argus never asked for. Media is deleted the moment the note is written. What you save, watch, and store is your business — literally: it all lives in plain files on your machine.
+**Fetching.** Argus is a personal-use tool built for respectful fetching *by design*: it downloads anonymously, never uses your cookies or login, never retries blocked content with credentials, and the queue works off an unlisted playlist precisely so your account is never touched. That last one is enforced, not merely intended: every fetch passes `--ignore-config`, so your own yt-dlp settings cannot quietly attach cookies, credentials, or postprocessors Argus never asked for. Media is deleted the moment the note is written. What you save, watch, and store is your business, literally: it all lives in plain files on your machine.
 
-**Failure policy.** Argus never dead-ends. A missing dependency gets one auto-install attempt, then the exact one-line fix for your OS — and you still get the best note your machine can currently produce, honestly flagged with what's missing.
+**Failure policy.** Argus never changes the machine to hide a missing prerequisite. It names the unavailable capability, gives the exact preparation command for the user's OS, and produces the best valid note the current machine supports. If no valid note can be produced, Argus stops and says the request was not completed.
 
 ## Anatomy
 
@@ -115,6 +127,6 @@ Welcome.md         # home: topic index
 Digest.md          # front page: every run, newest first
 Try Queue.md       # saved workflows; one weekly pick
 videos/            # one note per video/reel (+ _processed.txt ledger)
-topics/            # MOC index notes — one video appears in many
+topics/            # MOC index notes, one video appears in many
 tools/             # auto-growing cross-video dossiers per tool
 ```
