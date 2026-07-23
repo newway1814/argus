@@ -246,9 +246,11 @@ def windows_acl_is_secure(path):
         "$current=[System.Security.Principal.WindowsIdentity]::"
         "GetCurrent().User.Value; "
         'Write-Output \"CURRENT|$current|\"; '
-        f"(Get-Acl -LiteralPath '{literal_path}').Access | ForEach-Object {{ "
-        "$sid=$_.IdentityReference.Translate("
-        "[System.Security.Principal.SecurityIdentifier]).Value; "
+        "$rules=[System.IO.File]::GetAccessControl("
+        f"'{literal_path}').GetAccessRules("
+        "$true,$true,[System.Security.Principal.SecurityIdentifier]); "
+        "$rules | ForEach-Object { "
+        "$sid=$_.IdentityReference.Value; "
         'Write-Output \"$sid|$($_.FileSystemRights)|$($_.AccessControlType)\"'
         " }"
     )
@@ -268,10 +270,6 @@ def windows_acl_is_secure(path):
         )
     except (OSError, subprocess.TimeoutExpired):
         return False
-    if os.environ.get("ARGUS_DOCTOR_ACL_DEBUG") == "1":
-        print(f"ACL stdout: {result.stdout!r}", file=sys.stderr)
-        print(f"ACL stderr: {result.stderr!r}", file=sys.stderr)
-        print(f"ACL exit: {result.returncode}", file=sys.stderr)
     if result.returncode or not result.stdout.strip():
         return False
     current_sid = None
