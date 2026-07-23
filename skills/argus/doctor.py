@@ -15,6 +15,36 @@ from pathlib import Path
 MINIMUM_PYTHON = (3, 9)
 DEFAULT_MODEL = "small"
 SYNC_FOLDERS = {"onedrive", "dropbox", "google drive", "icloud drive"}
+BROAD_WINDOWS_SIDS = {
+    "S-1-1-0",
+    "S-1-5-11",
+    "S-1-5-32-545",
+}
+PLATFORM_POLICIES = {
+    "macos": {
+        "python": "brew install python@3.12",
+        "yt-dlp": "brew install yt-dlp",
+        "node": "brew install node",
+        "frames": "brew install ffmpeg",
+        "vault_create": 'mkdir -p "{path}"',
+    },
+    "linux": {
+        "python": "sudo apt-get install -y python3",
+        "yt-dlp": "sudo apt-get install -y yt-dlp",
+        "node": "sudo apt-get install -y nodejs",
+        "frames": "sudo apt-get install -y ffmpeg",
+        "vault_create": 'mkdir -p "{path}"',
+    },
+    "windows": {
+        "python": "winget install --id Python.Python.3.12 --exact",
+        "yt-dlp": "winget install --id yt-dlp.yt-dlp --exact",
+        "node": "winget install --id OpenJS.NodeJS.LTS --exact",
+        "frames": "winget install --id Gyan.FFmpeg --exact",
+        "vault_create": (
+            'New-Item -ItemType Directory -Force -Path "{path}"'
+        ),
+    },
+}
 
 
 def platform_name(requested):
@@ -55,7 +85,31 @@ cache_root = Path(
 )
 model_dir = cache_root / {model_folder}
 snapshots = model_dir / "snapshots"
-cached = snapshots.is_dir() and any(path.is_file() for path in snapshots.rglob("*"))
+cached = False
+if snapshots.is_dir():
+    for snapshot in snapshots.iterdir():
+        if not snapshot.is_dir():
+            continue
+        files = {{path.name for path in snapshot.iterdir() if path.is_file()}}
+        core = {{"model.bin", "config.json"}}
+        tokenizer = {{"tokenizer.json", "vocabulary.json", "vocabulary.txt"}}
+        incomplete = any(
+            path.name.endswith((".incomplete", ".lock"))
+            for path in model_dir.rglob("*")
+        )
+        core_ready = all(
+            (snapshot / name).stat().st_size > 0
+            for name in core
+            if (snapshot / name).is_file()
+        ) and core.issubset(files)
+        tokenizer_ready = any(
+            (snapshot / name).is_file()
+            and (snapshot / name).stat().st_size > 0
+            for name in tokenizer
+        )
+        if core_ready and tokenizer_ready and not incomplete:
+            cached = True
+            break
 print(json.dumps({{
     "sys_executable": sys.executable,
     "version": list(sys.version_info[:3]),
@@ -70,7 +124,8 @@ def probe_python(parts, model):
         return None, "python_cmd is empty"
     try:
         result = subprocess.run(
-            [*parts, "-c", python_probe_source(model)],
+            [*parts, "-B", "-c", python_probe_source(model)],
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             text=True,
             capture_output=True,
             timeout=15,
@@ -82,9 +137,29 @@ def probe_python(parts, model):
         detail = result.stderr.strip() or result.stdout.strip() or "probe failed"
         return None, detail
     try:
-        return json.loads(result.stdout.strip().splitlines()[-1]), None
+        payload = json.loads(result.stdout.strip().splitlines()[-1])
     except (IndexError, json.JSONDecodeError):
         return None, "probe returned no readable result"
+    required = {
+        "sys_executable": str,
+        "version": list,
+        "faster_whisper": bool,
+        "model_cached": bool,
+    }
+    if not isinstance(payload, dict) or any(
+        not isinstance(payload.get(key), expected)
+        for key, expected in required.items()
+    ):
+        return None, "probe returned an invalid result"
+    if (
+        len(payload["version"]) < 2
+        or not all(isinstance(part, int) for part in payload["version"])
+    ):
+        return None, "probe returned an invalid Python version"
+    resolved = Path(payload["sys_executable"]).expanduser()
+    if not resolved.is_file():
+        return None, f"resolved interpreter does not exist: {resolved}"
+    return payload, None
 
 
 def probe_command(name, version_args):
@@ -107,15 +182,71 @@ def probe_command(name, version_args):
     return (path, first_line[0] if first_line else "version unknown")
 
 
-def config_is_secure(path, platform):
-    if platform == "windows":
-        try:
-            relative = path.resolve().relative_to(Path.home().resolve())
-        except ValueError:
+def powershell_path():
+    if os.name == "nt":
+        system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+        executable = system_root / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
+        if executable.is_file():
+            return str(executable)
+    return shutil.which("powershell.exe")
+
+
+def windows_acl_is_secure(path):
+    executable = powershell_path()
+    if not executable:
+        return False
+    script = (
+        "(Get-Acl -LiteralPath $args[0]).Access | ForEach-Object { "
+        "$sid=$_.IdentityReference.Translate("
+        "[System.Security.Principal.SecurityIdentifier]).Value; "
+        'Write-Output \"$sid|$($_.FileSystemRights)|$($_.AccessControlType)\"'
+        " }"
+    )
+    try:
+        result = subprocess.run(
+            [
+                executable,
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                script,
+                str(path),
+            ],
+            text=True,
+            capture_output=True,
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if result.returncode or not result.stdout.strip():
+        return False
+    for row in result.stdout.splitlines():
+        parts = row.strip().split("|", 2)
+        if len(parts) != 3:
+            continue
+        sid, rights, access_type = parts
+        if (
+            sid in BROAD_WINDOWS_SIDS
+            and access_type.lower() == "allow"
+            and rights not in {"", "0"}
+        ):
             return False
-        lowered = {part.lower() for part in relative.parts}
-        return not lowered.intersection(SYNC_FOLDERS)
-    return stat.S_IMODE(path.stat().st_mode) & 0o077 == 0
+    return True
+
+
+def config_security(path, platform):
+    if platform != "windows":
+        secure = stat.S_IMODE(path.stat().st_mode) & 0o077 == 0
+        return secure, "permissions"
+    try:
+        relative = path.resolve().relative_to(Path.home().resolve())
+    except ValueError:
+        return False, "location"
+    lowered = {part.lower() for part in relative.parts}
+    if lowered.intersection(SYNC_FOLDERS):
+        return False, "location"
+    return windows_acl_is_secure(path), "permissions"
 
 
 def vault_is_writable(path):
@@ -129,43 +260,41 @@ def status(ready):
     return "ready" if ready else "unavailable"
 
 
+def configured_status(ready, configured):
+    if ready:
+        return "ready"
+    return "unavailable" if configured else "not configured"
+
+
 def vault_preparation_command(path, platform):
+    if not path.exists():
+        return PLATFORM_POLICIES[platform]["vault_create"].format(path=path)
     if platform == "windows":
         return f'icacls "{path}" /grant "%USERNAME%:(OI)(CI)M"'
     return f'chmod u+w "{path}"'
 
 
-def config_preparation_command(path, platform):
-    if platform == "windows":
+def config_preparation_command(path, platform, reason):
+    if platform == "windows" and reason == "location":
         destination = "$HOME\\.claude\\argus.config.json"
         return (
             f'Move-Item -LiteralPath "{path}" -Destination "{destination}"'
+        )
+    if platform == "windows":
+        return (
+            f'icacls "{path}" /inheritance:r '
+            "/remove:g *S-1-1-0 *S-1-5-11 *S-1-5-32-545 "
+            '/grant:r "%USERNAME%:F"'
         )
     return f'chmod 600 "{path}"'
 
 
 def tool_preparation_command(capability, platform):
-    commands = {
-        "node": {
-            "macos": "brew install node",
-            "linux": "sudo apt-get install -y nodejs",
-            "windows": "winget install --id OpenJS.NodeJS.LTS --exact",
-        },
-        "frames": {
-            "macos": "brew install ffmpeg",
-            "linux": "sudo apt-get install -y ffmpeg",
-            "windows": "winget install --id Gyan.FFmpeg --exact",
-        },
-    }
-    return commands[capability][platform]
+    return PLATFORM_POLICIES[platform][capability]
 
 
 def python_preparation_command(platform):
-    return {
-        "macos": "brew install python@3.12",
-        "linux": "sudo apt-get install -y python3",
-        "windows": "winget install --id Python.Python.3.12 --exact",
-    }[platform]
+    return PLATFORM_POLICIES[platform]["python"]
 
 
 def main():
@@ -229,21 +358,25 @@ def main():
         "ffmpeg": probe_command("ffmpeg", ("-version",)),
         "ffprobe": probe_command("ffprobe", ("-version",)),
     }
-    config_secure = config_is_secure(config_path, platform)
+    config_secure, config_security_reason = config_security(
+        config_path,
+        platform,
+    )
     vault_path = Path(str(config.get("vault_path") or "")).expanduser()
     vault_writable = vault_is_writable(vault_path)
 
     captions = python_ready and bool(tools["yt-dlp"])
     transcription = python_ready and faster_whisper and model_cached
-    frames = bool(tools["ffmpeg"] and tools["ffprobe"])
+    frame_tools_ready = bool(tools["ffmpeg"] and tools["ffprobe"])
+    frames = python_ready and frame_tools_ready
     vault_writing = python_ready and config_secure and vault_writable
-    intake_configured = bool(
-        config.get("playlist_url")
-        or (config.get("telegram_token") and config.get("telegram_owner_id"))
-    )
+    telegram_configured = bool(config.get("telegram_token"))
+    telegram_paired = bool(config.get("telegram_owner_id"))
+    intake_configured = bool(config.get("playlist_url") or telegram_configured)
     queue = captions and vault_writing and intake_configured
     telegram = bool(
-        config_secure
+        python_ready
+        and config_secure
         and config.get("telegram_token")
         and config.get("telegram_owner_id")
     )
@@ -254,7 +387,8 @@ def main():
     print(f"config permissions: {status(config_secure)}")
     if not config_secure:
         print(
-            f"  prepare: {config_preparation_command(config_path, platform)}"
+            "  prepare: "
+            f"{config_preparation_command(config_path, platform, config_security_reason)}"
         )
     print("Python")
     print(f"  configured: {configured_python or 'missing'}")
@@ -287,15 +421,19 @@ def main():
             print(f"  {name}: ready ({result[1]})")
         else:
             print(f"  {name}: unavailable")
-            if name == "yt-dlp" and python_info:
-                resolved = python_info["sys_executable"]
-                print(
-                    f'    prepare: "{resolved}" -m pip install --upgrade yt-dlp'
-                )
+            if name == "yt-dlp":
+                if python_info:
+                    resolved = python_info["sys_executable"]
+                    command = (
+                        f'"{resolved}" -m pip install --upgrade yt-dlp'
+                    )
+                else:
+                    command = tool_preparation_command("yt-dlp", platform)
+                print(f"    prepare: {command}")
             if name == "node":
                 command = tool_preparation_command("node", platform)
                 print(f"    prepare: {command}")
-    if not frames:
+    if not frame_tools_ready:
         command = tool_preparation_command("frames", platform)
         print(f"  frame tools prepare: {command}")
     print(f"vault: {vault_path}")
@@ -306,8 +444,13 @@ def main():
     print(f"  transcription: {status(transcription)}")
     print(f"  frames: {status(frames)}")
     print(f"  vault writing: {status(vault_writing)}")
-    print(f"  queue: {status(queue)}")
-    print(f"  Telegram: {status(telegram)}")
+    print(f"  queue: {configured_status(queue, intake_configured)}")
+    print(
+        "  Telegram: "
+        f"{configured_status(telegram, telegram_configured)}"
+    )
+    if telegram_configured and not telegram_paired:
+        print("    prepare: /argus setup telegram")
 
     required_healthy = python_ready and bool(tools["yt-dlp"]) and vault_writing
     print(f"overall: {'healthy' if required_healthy else 'unhealthy'}")
