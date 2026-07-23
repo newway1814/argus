@@ -72,7 +72,7 @@ Each level is opt-in and sets itself up in chat the first time you reach for it.
 
 **Level 2 — the YouTube queue.** First `/argus queue` walks you through creating an **unlisted** playlist (readable with zero login — no cookies, no API keys, your account never touched). From then on, saving a video is two taps and draining is one command.
 
-**Level 3 — the Telegram inbox + digest.** Optional, one minute with @BotFather. Your bot becomes a universal inbox — **Share → Telegram → bot, from any app** (this is what catches Instagram reels) — *and* an outbox: after every drain it messages you a digest — what was watched, this week's experiment to try, and the few minutes worth actual eyeballs.
+**Level 3 — the Telegram inbox + digest.** Optional, one minute with @BotFather. Your bot becomes a universal inbox — **Share → Telegram → bot, from any app** (this is what catches Instagram reels) — *and* an outbox: after every drain it messages you a digest — what was watched, this week's experiment to try, and the few minutes worth actual eyeballs. Setup pairs the bot to you with a one-time code, so nobody who stumbles onto it can feed your queue, and the token is only ever read by the helper that makes the call — it never reaches a command line or a log. One honest limit: Telegram itself holds unread shares for **24 hours**, so drain about daily. Everything drained is kept permanently in the vault, before Telegram is allowed to forget it.
 
 ## The payoff — retrieval
 
@@ -88,7 +88,7 @@ The system is honest about what it is: a *reference system with a triage layer*,
 
 **Tokens.** Tier 1 (transcript-only) is cheap. The frame pass reads 30–80 frames and costs roughly a long Claude Code session per tutorial; the frame budget is hard-capped at 80 regardless of video length, and videos over 60 minutes stay transcript-only unless you force `--frames`. Anything over ~90 minutes stops and asks first — it tells you the cost and offers to process by the video's own chapters (one note, a section per chapter), because a marathon lecture is a season, not an episode. Drain a big queue on a day you're not racing your usage limits.
 
-**Fetching.** Argus is a personal-use tool built for respectful fetching *by design*: it downloads anonymously, never uses your cookies or login, never retries blocked content with credentials, and the queue works off an unlisted playlist precisely so your account is never touched. Media is deleted the moment the note is written. What you save, watch, and store is your business — literally: it all lives in plain files on your machine.
+**Fetching.** Argus is a personal-use tool built for respectful fetching *by design*: it downloads anonymously, never uses your cookies or login, never retries blocked content with credentials, and the queue works off an unlisted playlist precisely so your account is never touched. That last one is enforced, not merely intended: every fetch passes `--ignore-config`, so your own yt-dlp settings cannot quietly attach cookies, credentials, or postprocessors Argus never asked for. Media is deleted the moment the note is written. What you save, watch, and store is your business — literally: it all lives in plain files on your machine.
 
 **Failure policy.** Argus never dead-ends. A missing dependency gets one auto-install attempt, then the exact one-line fix for your OS — and you still get the best note your machine can currently produce, honestly flagged with what's missing.
 

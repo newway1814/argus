@@ -13,18 +13,19 @@ Plain markdown, zero plugins, no embeddings. Retrieval is Grep + wikilinks (Karp
 
 | Path | Holds |
 |---|---|
-| `Digest.md` | Front page. Last 10 processing runs, newest first; older runs live in `Digest Archive.md`. |
+| `Digest.md` | Front page. Last 10 processing runs, newest first; older runs live in `Digest Archive.md`. Scaffolded as a `# Digest` heading followed by a `---` rule; every new entry is prepended directly below that rule, so the rule must exist before the first run. |
 | `videos/` | One note per watched video or reel (written by the argus skill). |
 | `topics/` | MOC index notes, one per discipline (e.g. `AI Agents.md`). A video is linked from every topic it touches. |
 | `tools/` | One dossier per tool/technique, appended each time a new video mentions it. |
-| `videos/_processed.txt` | Ledger of processed video IDs, one per line. |
+| `videos/_processed.txt` | Ledger of processed items, one `<source>:<id>` identity per line. |
+| `_inbox.jsonl` | Durable copy of everything shared to the Telegram bot, written before the Bot API is allowed to forget it. |
 | `Try Queue.md` | Workflows saved but not yet tried. One **weekly pick** at top; sections: Untried / Tried / Dismissed. |
 
 ## Conventions
 
 - `[[wikilinks]]` everywhere; Title Case filenames.
-- Video notes are named `YYYY-MM-DD - <Title>.md` (published date).
-- Every note carries YAML frontmatter with `tags`; video notes add `type` (tutorial | news | explainer | opinion | workflow) and `watch-verdict` (skip | skim | watch | try).
+- Video notes are named `YYYY-MM-DD - <Title>.md` (published date) and carry an `identity` (`<source>:<id>`) in frontmatter — the same string the ledger holds. Neither the name nor the frontmatter is written by hand: the argus skill's `note_writer.py` emits both, and it owns the field list and the `type` / `watch-verdict` enums, so there is one place to change them.
+- Every note carries YAML frontmatter with `tags`. Tag with the names of the `topics/` MOCs the note belongs to and nothing else — invented one-off tags are unsearchable, since retrieval here is Grep and wikilinks.
 - `try` notes get a line in `Try Queue.md` (Untried section): `- [[note]] — what the workflow does · setup cost`. The weekly pick rotates when older than 7 days: current pick moves back to Untried (or Tried/Dismissed per the user), the oldest Untried item becomes the pick.
 - **Mid-task surfacing:** when the user's current work matches a `try` note's workflow, mention it — "you saved a reel about exactly this" — and on their say-so move it to Tried.
 - Topic MOCs are grouped link lists — `- [[note]] — one-line hook`. Create a new MOC when ≥2 notes share a theme no existing MOC covers; also add the new MOC line to `Welcome.md`.
