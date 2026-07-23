@@ -22,8 +22,27 @@ except ImportError:
              "Without it, write the note from captions and mark the audio unread.")
 
 
-def load():
-    return WhisperModel(MODEL, compute_type="int8")
+def load(device="cpu"):
+    return WhisperModel(MODEL, device=device, compute_type="int8")
+
+
+def transcribe(media):
+    """Take the GPU when it genuinely works, CPU otherwise.
+
+    A machine with a GPU but an incomplete CUDA install loads the model happily
+    and only fails at encode time with a missing cublas DLL, so the fallback has
+    to wrap the transcription itself, not just the constructor.
+    """
+    for device in ("auto", "cpu"):
+        try:
+            segments, _info = load(device).transcribe(str(media), vad_filter=True)
+            return list(segments)
+        except (RuntimeError, OSError) as e:
+            if device == "cpu":
+                sys.exit(f"transcribe_audio: {e}")
+            print(f"transcribe_audio: GPU path unavailable ({e}); falling back to CPU",
+                  file=sys.stderr)
+    return []
 
 
 if __name__ == "__main__":
@@ -40,9 +59,8 @@ if __name__ == "__main__":
         sys.exit(f"transcribe_audio: not found: {media}")
 
     # vad_filter keeps whisper from looping invented text over silent stretches.
-    segments, _info = load().transcribe(str(media), vad_filter=True)
     lines = [f"[{int(s.start) // 60}:{int(s.start) % 60:02d}] {s.text.strip()}"
-             for s in segments]
+             for s in transcribe(media)]
     if not lines:
         sys.exit(f"transcribe_audio: no speech found in {media.name} — "
                  "treat as silent, not as a failed read")
