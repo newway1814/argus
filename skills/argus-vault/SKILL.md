@@ -1,11 +1,11 @@
 ---
-name: obsidian-vault
-description: Search, create, and organize notes in the Obsidian vault. Use when the user asks whether they've already watched/learned/seen something, wants an answer from their notes, or wants notes created or organized; also when another skill (e.g. argus) needs the vault's conventions.
+name: argus-vault
+description: Search and organize the Argus watch-vault — notes filed from watched YouTube videos and Instagram reels. Use when the user asks whether they've watched/seen something about a topic, wants an answer from their watch notes, or when the argus skill needs the vault's conventions. Not for the user's other Obsidian vaults or personal notes.
 ---
 
-# Obsidian Vault
+# Argus Vault
 
-Vault: the `vault_path` in `~/.claude/argus.config.json` (missing → the argus skill's SETUP.md first-run flow creates it).
+Vault: the `vault_path` in `~/.claude/argus.config.json` (missing → the argus skill's SETUP.md first-run flow creates it). This skill owns only the Argus watch-vault — never apply its conventions to the user's other vaults or notes.
 
 Plain markdown, zero plugins, no embeddings. Retrieval is Grep + wikilinks (Karpathy LLM-wiki style).
 
@@ -14,12 +14,11 @@ Plain markdown, zero plugins, no embeddings. Retrieval is Grep + wikilinks (Karp
 | Path | Holds |
 |---|---|
 | `Digest.md` | Front page. Last 10 processing runs, newest first; older runs live in `Digest Archive.md`. |
-| `videos/` | One note per YouTube video (written by the argus skill). |
+| `videos/` | One note per watched video or reel (written by the argus skill). |
 | `topics/` | MOC index notes, one per discipline (e.g. `AI Agents.md`). A video is linked from every topic it touches. |
-| `tools/` | One dossier per tool/project, appended each time a new video mentions it. |
+| `tools/` | One dossier per tool/technique, appended each time a new video mentions it. |
 | `videos/_processed.txt` | Ledger of processed video IDs, one per line. |
 | `Try Queue.md` | Workflows saved but not yet tried. One **weekly pick** at top; sections: Untried / Tried / Dismissed. |
-| `_dashboard.html` | Generated phone dashboard (argus skill rebuilds it; never edit by hand). |
 
 ## Conventions
 
@@ -30,7 +29,7 @@ Plain markdown, zero plugins, no embeddings. Retrieval is Grep + wikilinks (Karp
 - **Mid-task surfacing:** when the user's current work matches a `try` note's workflow, mention it — "you saved a reel about exactly this" — and on their say-so move it to Tried.
 - Topic MOCs are grouped link lists — `- [[note]] — one-line hook`. Create a new MOC when ≥2 notes share a theme no existing MOC covers; also add the new MOC line to `Welcome.md`.
 - Tool dossiers: one line on what it is, official link, then one bullet per video: `- [[video note]] — what it said`.
-- **Dossier bar:** a tool earns a page only if it's worth remembering — AI tooling, new or obscure projects, things the user might later half-recall ("some video mentioned a thing that…"). Household names (React, Next.js, Docker, …) stay inline as plain text.
+- **Dossier bar:** a page is earned by anything worth remembering by name — tools, techniques, named methods, obscure projects; the things the user might later half-recall ("some video mentioned a thing that…"). AI tooling is the archetype, but a knife-sharpening method or a training protocol qualifies the same way. Household names (React, Docker, olive oil, …) stay inline as plain text.
 - Wikilinks resolve by filename vault-wide: a name may exist in `topics/` **or** `tools/`, never both.
 
 ## Retrieval — "have I watched anything about X?"
