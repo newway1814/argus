@@ -95,6 +95,7 @@ class DoctorCliTests(unittest.TestCase):
                 [
                     "icacls",
                     str(path),
+                    "/reset",
                     "/inheritance:r",
                     "/grant:r",
                     f"{user}:F",
@@ -240,7 +241,8 @@ class DoctorCliTests(unittest.TestCase):
         self.prepare_machine()
 
         if HOST_PLATFORM == "windows":
-            outside = self.root / "argus.config.json"
+            outside = self.root / "OneDrive" / "argus.config.json"
+            outside.parent.mkdir()
             outside.write_bytes(self.config.read_bytes())
             self.secure_config(outside)
             result = self.run_doctor(config=outside)
