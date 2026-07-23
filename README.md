@@ -86,7 +86,7 @@ The system is honest about what it is: a *reference system with a triage layer*,
 
 ## Costs and conduct — stated plainly
 
-**Tokens.** Tier 1 (transcript-only) is cheap. The frame pass reads 30–80 frames and costs roughly a long Claude Code session per tutorial; the frame budget is hard-capped at 80 regardless of video length, and videos over 60 minutes stay transcript-only unless you force `--frames`. Drain a big queue on a day you're not racing your usage limits.
+**Tokens.** Tier 1 (transcript-only) is cheap. The frame pass reads 30–80 frames and costs roughly a long Claude Code session per tutorial; the frame budget is hard-capped at 80 regardless of video length, and videos over 60 minutes stay transcript-only unless you force `--frames`. Anything over ~90 minutes stops and asks first — it tells you the cost and offers to process by the video's own chapters (one note, a section per chapter), because a marathon lecture is a season, not an episode. Drain a big queue on a day you're not racing your usage limits.
 
 **Fetching.** Argus is a personal-use tool built for respectful fetching *by design*: it downloads anonymously, never uses your cookies or login, never retries blocked content with credentials, and the queue works off an unlisted playlist precisely so your account is never touched. Media is deleted the moment the note is written. What you save, watch, and store is your business — literally: it all lives in plain files on your machine.
 
