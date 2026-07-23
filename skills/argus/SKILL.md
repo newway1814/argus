@@ -26,7 +26,7 @@ Reel or Short (instagram.com/reel, /shorts/)? Follow [REELS.md](REELS.md). Regul
    yt-dlp --js-runtimes node --skip-download --print "%(title)s | %(channel)s | %(upload_date)s | %(duration_string)s" <url>
    ```
    - No English subs? Run `--list-subs` and fetch the video's original language instead.
-   - No captions in any language? Write a stub note (metadata, `watch-verdict: watch`, body: "No captions — Argus could not watch this; needs eyeballs"), add a digest line saying so, ledger it, and stop.
+   - No captions in any language? Listen instead of stubbing: `yt-dlp --js-runtimes node -f bestaudio -x --audio-format m4a -o "%(id)s.%(ext)s" <url>`, then `python "<this skill's folder>/transcribe_audio.py" <id>.m4a transcript.txt` (faster-whisper installs on first use per SETUP.md; local, no upload). Only if transcription is impossible on this machine: write a stub note (metadata, `watch-verdict: watch`, body: "No captions and no local transcription — needs eyeballs"), add a digest line saying so, ledger it, and stop.
    - Collapse the rolling SRT before reading — raw auto-captions repeat every line ~3×:
    ```
    python "<this skill's folder>/clean_transcript.py" <id>.en.srt transcript.txt

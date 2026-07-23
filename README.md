@@ -99,10 +99,11 @@ skills/
   argus/
     SKILL.md             # the pipeline: ledger → transcript → tier decision → note → cross-links → digest
     SETUP.md             # self-configuring first run + lazy per-feature setup
-    FRAMES.md            # the frame pass: scene detection, timestamp alignment, blind-spot stills
+    FRAMES.md            # the frame pass: scene scoring, timestamp alignment, blind-spot stills
     REELS.md             # reels/Shorts: speech + burned-in overlays + caption, aligned
+    extract_frames.py    # single-decode scene scoring: burst collapse, budget cap, gap report
     clean_transcript.py  # collapses rolling auto-caption SRT into clean [m:ss] lines (~5-10x fewer tokens)
-    transcribe_audio.py  # local faster-whisper transcription for reels
+    transcribe_audio.py  # local faster-whisper transcription for reels and caption-less videos
   argus-vault/
     SKILL.md             # vault conventions (MOCs, dossiers, Try Queue) + the retrieval workflow
 ```
