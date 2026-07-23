@@ -9,9 +9,11 @@ allowed-tools: Bash(python "${CLAUDE_SKILL_DIR}/"*), Bash(python3 "${CLAUDE_SKIL
 
 The hundred-eyed watchman: watches so the user doesn't have to, and files everything for later retrieval. Vault path and conventions live in the **argus-vault** skill, follow it for all writing and linking.
 
-Usage: `/argus <url>` · `/argus <url> --frames` (force the frame pass) · `/argus queue`
+Usage: `/argus <url>` · `/argus <url> --frames` (force the frame pass) · `/argus queue` · `/argus doctor`
 
 Instance config (vault path, playlist URL, Telegram token) lives at `~/.claude/argus.config.json`. Config missing, or a needed piece empty? Follow [SETUP.md](SETUP.md) to configure Argus files and inspect user-managed prerequisites. The Telegram token stays inside that file: [telegram.py](telegram.py) reads it and makes every Bot API call, so the token never enters a command line, a tool log, or this transcript.
+
+**Doctor is the read-only preflight.** For `/argus doctor`, run `<launcher> "${CLAUDE_SKILL_DIR}/doctor.py"`, where `<launcher>` is any available Python 3.9+ interpreter. The doctor separately probes the exact `python_cmd` recorded in config, checks every capability, and exits nonzero only when a required component is unhealthy. It never installs, downloads, scaffolds, changes permissions, or rewrites config. Report its output as-is. If no launcher exists, follow [SETUP.md](SETUP.md) and give the operating-system preparation command instead of pretending the doctor ran.
 
 **Never mutate the machine during a video run.** When a dependency or fetch fails: (1) state which capability is unavailable, (2) give the exact preparation command for the user's OS without running it, and (3) proceed with the best valid note this machine can produce, flagging what is missing (`frames: no`, "audio unread: prepare faster-whisper to unlock"). If no valid note can be produced, stop and say the request was not completed. Never claim successful setup or successful watching merely because a stub exists.
 
