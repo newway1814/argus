@@ -170,7 +170,9 @@ class DoctorCliTests(unittest.TestCase):
     def test_healthy_environment_reports_every_capability(self):
         python = self.prepare_machine()
 
-        result = self.run_doctor()
+        result = self.run_doctor(
+            extra_env={"ARGUS_DOCTOR_ACL_DEBUG": "1"} if os.name == "nt" else None
+        )
         acl_diagnostics = ""
         if os.name == "nt":
             acl_diagnostics = subprocess.run(
