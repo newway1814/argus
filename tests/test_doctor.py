@@ -209,6 +209,10 @@ class DoctorCliTests(unittest.TestCase):
         self.assertIn(f"resolved: {python}", result.stdout)
         self.assertIn("faster-whisper: unavailable", result.stdout)
         self.assertIn("transcription: unavailable", result.stdout)
+        self.assertIn(
+            "limitation: captioned videos work; reels and captionless videos",
+            result.stdout,
+        )
         command = f'"{python}" -m pip install faster-whisper'
         self.assertEqual(result.stdout.count(f"prepare: {command}"), 1)
 
@@ -488,6 +492,25 @@ class DoctorCliTests(unittest.TestCase):
         )
         self.assertIn("model small cache: ready", complete.stdout)
 
+    def test_broken_faster_whisper_install_is_not_reported_as_importable(self):
+        site = self.root / "site"
+        site.mkdir()
+        (site / "faster_whisper.py").write_text(
+            'raise RuntimeError("broken native dependency")\n',
+            encoding="utf-8",
+        )
+        self.prepare_machine(
+            python_cmd=sys.executable,
+            node=False,
+            ffmpeg=False,
+            ffprobe=False,
+        )
+
+        result = self.run_doctor(extra_env={"PYTHONPATH": str(site)})
+
+        self.assertIn("faster-whisper: unavailable", result.stdout)
+        self.assertIn("broken native dependency", result.stdout)
+
     def test_windows_acl_readable_by_everyone_is_insecure(self):
         self.prepare_machine()
         cleanup_acl = None
@@ -519,8 +542,7 @@ class DoctorCliTests(unittest.TestCase):
                 "S-1-1-0|Read|Allow",
             )
         command = (
-            f'icacls "{self.config}" /inheritance:r '
-            "/remove:g *S-1-1-0 *S-1-5-11 *S-1-5-32-545 "
+            f'icacls "{self.config}" /reset /inheritance:r '
             '/grant:r "%USERNAME%:F"'
         )
 
@@ -529,6 +551,50 @@ class DoctorCliTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("config permissions: unavailable", result.stdout)
         self.assertEqual(result.stdout.count(f"prepare: {command}"), 1)
+
+    @unittest.skipIf(os.name == "nt", "simulated ACL fixture is POSIX-only")
+    def test_windows_acl_readable_by_another_account_is_insecure(self):
+        self.prepare_machine()
+        self.executable(
+            "powershell.exe",
+            "CURRENT|S-1-5-21-1000|\n"
+            "S-1-5-21-1000|FullControl|Allow\n"
+            "S-1-5-21-2000|Read|Allow",
+        )
+
+        result = self.run_doctor("windows")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("config permissions: unavailable", result.stdout)
+
+    def test_telegram_only_queue_requires_a_paired_owner(self):
+        self.prepare_machine()
+        config = json.loads(self.config.read_text(encoding="utf-8"))
+        config["playlist_url"] = ""
+        config["telegram_owner_id"] = None
+        self.config.write_text(json.dumps(config), encoding="utf-8")
+        self.secure_config(self.config)
+
+        result = self.run_doctor()
+
+        self.assertIn("queue: unavailable", result.stdout)
+        self.assertIn("Telegram: unavailable", result.stdout)
+        self.assertEqual(
+            result.stdout.count("prepare: /argus setup telegram"),
+            1,
+        )
+
+    def test_linux_commands_follow_detected_package_manager(self):
+        self.prepare_machine(node=False, ffmpeg=False, ffprobe=False)
+        self.executable("dnf", "dnf 5")
+
+        result = self.run_doctor("linux")
+
+        self.assertIn("prepare: sudo dnf install -y nodejs", result.stdout)
+        self.assertIn(
+            "prepare: sudo dnf install -y ffmpeg-free",
+            result.stdout,
+        )
 
 
 if __name__ == "__main__":

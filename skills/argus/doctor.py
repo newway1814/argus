@@ -15,11 +15,6 @@ from pathlib import Path
 MINIMUM_PYTHON = (3, 9)
 DEFAULT_MODEL = "small"
 SYNC_FOLDERS = {"onedrive", "dropbox", "google drive", "icloud drive"}
-BROAD_WINDOWS_SIDS = {
-    "S-1-1-0",
-    "S-1-5-11",
-    "S-1-5-32-545",
-}
 PLATFORM_POLICIES = {
     "macos": {
         "python": "brew install python@3.12",
@@ -44,6 +39,53 @@ PLATFORM_POLICIES = {
             'New-Item -ItemType Directory -Force -Path "{path}"'
         ),
     },
+}
+LINUX_MANAGER_POLICIES = {
+    "apt-get": {
+        "python": "sudo apt-get install -y python3",
+        "yt-dlp": "sudo apt-get install -y yt-dlp",
+        "node": "sudo apt-get install -y nodejs",
+        "frames": "sudo apt-get install -y ffmpeg",
+    },
+    "dnf": {
+        "python": "sudo dnf install -y python3",
+        "yt-dlp": "sudo dnf install -y yt-dlp",
+        "node": "sudo dnf install -y nodejs",
+        "frames": "sudo dnf install -y ffmpeg-free",
+    },
+    "yum": {
+        "python": "sudo yum install -y python3",
+        "yt-dlp": "sudo yum install -y yt-dlp",
+        "node": "sudo yum install -y nodejs",
+        "frames": "sudo yum install -y ffmpeg",
+    },
+    "pacman": {
+        "python": "sudo pacman -S --needed python",
+        "yt-dlp": "sudo pacman -S --needed yt-dlp",
+        "node": "sudo pacman -S --needed nodejs",
+        "frames": "sudo pacman -S --needed ffmpeg",
+    },
+    "zypper": {
+        "python": "sudo zypper install -y python3",
+        "yt-dlp": "sudo zypper install -y yt-dlp",
+        "node": "sudo zypper install -y nodejs",
+        "frames": "sudo zypper install -y ffmpeg",
+    },
+    "apk": {
+        "python": "sudo apk add python3",
+        "yt-dlp": "sudo apk add yt-dlp",
+        "node": "sudo apk add nodejs",
+        "frames": "sudo apk add ffmpeg",
+    },
+}
+LINUX_ID_MANAGERS = {
+    "alpine": "apk",
+    "arch": "pacman",
+    "debian": "apt-get",
+    "fedora": "dnf",
+    "rhel": "dnf",
+    "suse": "zypper",
+    "ubuntu": "apt-get",
 }
 
 
@@ -83,6 +125,13 @@ cache_root = Path(
     or os.environ.get("HUGGINGFACE_HUB_CACHE")
     or Path.home() / ".cache" / "huggingface" / "hub"
 )
+try:
+    importlib.import_module("faster_whisper")
+    faster_whisper = True
+    faster_whisper_error = ""
+except Exception as error:
+    faster_whisper = False
+    faster_whisper_error = f"{{type(error).__name__}}: {{error}}"
 model_dir = cache_root / {model_folder}
 snapshots = model_dir / "snapshots"
 cached = False
@@ -113,7 +162,8 @@ if snapshots.is_dir():
 print(json.dumps({{
     "sys_executable": sys.executable,
     "version": list(sys.version_info[:3]),
-    "faster_whisper": importlib.util.find_spec("faster_whisper") is not None,
+    "faster_whisper": faster_whisper,
+    "faster_whisper_error": faster_whisper_error,
     "model_cached": cached,
 }}))
 """
@@ -196,6 +246,9 @@ def windows_acl_is_secure(path):
     if not executable:
         return False
     script = (
+        "$current=[System.Security.Principal.WindowsIdentity]::"
+        "GetCurrent().User.Value; "
+        'Write-Output \"CURRENT|$current|\"; '
         "(Get-Acl -LiteralPath $args[0]).Access | ForEach-Object { "
         "$sid=$_.IdentityReference.Translate("
         "[System.Security.Principal.SecurityIdentifier]).Value; "
@@ -221,13 +274,27 @@ def windows_acl_is_secure(path):
         return False
     if result.returncode or not result.stdout.strip():
         return False
+    current_sid = None
+    access_rows = []
     for row in result.stdout.splitlines():
         parts = row.strip().split("|", 2)
         if len(parts) != 3:
             continue
         sid, rights, access_type = parts
+        if sid == "CURRENT":
+            current_sid = rights
+            continue
+        access_rows.append((sid, rights, access_type))
+    if not current_sid:
+        return False
+    allowed_sids = {
+        current_sid,
+        "S-1-5-18",
+        "S-1-5-32-544",
+    }
+    for sid, rights, access_type in access_rows:
         if (
-            sid in BROAD_WINDOWS_SIDS
+            sid not in allowed_sids
             and access_type.lower() == "allow"
             and rights not in {"", "0"}
         ):
@@ -282,19 +349,44 @@ def config_preparation_command(path, platform, reason):
         )
     if platform == "windows":
         return (
-            f'icacls "{path}" /inheritance:r '
-            "/remove:g *S-1-1-0 *S-1-5-11 *S-1-5-32-545 "
+            f'icacls "{path}" /reset /inheritance:r '
             '/grant:r "%USERNAME%:F"'
         )
     return f'chmod 600 "{path}"'
 
 
 def tool_preparation_command(capability, platform):
+    if platform == "linux":
+        manager = linux_package_manager()
+        return LINUX_MANAGER_POLICIES[manager][capability]
     return PLATFORM_POLICIES[platform][capability]
 
 
 def python_preparation_command(platform):
-    return PLATFORM_POLICIES[platform]["python"]
+    return tool_preparation_command("python", platform)
+
+
+def linux_package_manager():
+    for manager in LINUX_MANAGER_POLICIES:
+        if shutil.which(manager):
+            return manager
+    try:
+        rows = Path("/etc/os-release").read_text(encoding="utf-8")
+    except OSError:
+        return "apt-get"
+    values = {}
+    for row in rows.splitlines():
+        key, separator, value = row.partition("=")
+        if separator:
+            values[key] = value.strip().strip('"').lower()
+    identities = [
+        values.get("ID", ""),
+        *values.get("ID_LIKE", "").split(),
+    ]
+    for identity in identities:
+        if identity in LINUX_ID_MANAGERS:
+            return LINUX_ID_MANAGERS[identity]
+    return "apt-get"
 
 
 def main():
@@ -350,6 +442,11 @@ def main():
         and tuple(python_info.get("version", (0, 0))) >= MINIMUM_PYTHON
     )
     faster_whisper = bool(python_info and python_info.get("faster_whisper"))
+    faster_whisper_error = (
+        str(python_info.get("faster_whisper_error") or "")
+        if python_info
+        else ""
+    )
     model_cached = bool(python_info and python_info.get("model_cached"))
 
     tools = {
@@ -373,13 +470,14 @@ def main():
     telegram_configured = bool(config.get("telegram_token"))
     telegram_paired = bool(config.get("telegram_owner_id"))
     intake_configured = bool(config.get("playlist_url") or telegram_configured)
-    queue = captions and vault_writing and intake_configured
     telegram = bool(
         python_ready
         and config_secure
         and config.get("telegram_token")
         and config.get("telegram_owner_id")
     )
+    intake_ready = bool(config.get("playlist_url") or telegram)
+    queue = captions and vault_writing and intake_ready
 
     print("Argus doctor (read-only)")
     print(f"platform: {platform}")
@@ -400,6 +498,8 @@ def main():
             print(f"    prepare: {python_preparation_command(platform)}")
         print(f"  faster-whisper: {status(faster_whisper)}")
         if not faster_whisper:
+            if faster_whisper_error:
+                print(f"    import error: {faster_whisper_error}")
             print(
                 f'    prepare: "{python_info["sys_executable"]}" '
                 "-m pip install faster-whisper"
@@ -437,6 +537,10 @@ def main():
         command = tool_preparation_command("frames", platform)
         print(f"  frame tools prepare: {command}")
     print(f"vault: {vault_path}")
+    print(
+        "  permission check: "
+        f"{'allows writing' if vault_writable else 'unavailable'}"
+    )
     if not vault_writable:
         print(f"  prepare: {vault_preparation_command(vault_path, platform)}")
     print("Capabilities")
@@ -451,6 +555,11 @@ def main():
     )
     if telegram_configured and not telegram_paired:
         print("    prepare: /argus setup telegram")
+    if python_ready and not transcription:
+        print(
+            "limitation: captioned videos work; reels and captionless videos "
+            "need the transcription preparation above"
+        )
 
     required_healthy = python_ready and bool(tools["yt-dlp"]) and vault_writing
     print(f"overall: {'healthy' if required_healthy else 'unhealthy'}")
