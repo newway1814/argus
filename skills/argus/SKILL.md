@@ -15,7 +15,11 @@ Instance config (vault path, playlist URL, Telegram token) lives at `~/.claude/a
 
 **Never mutate the machine during a video run.** When a dependency or fetch fails: (1) state which capability is unavailable, (2) give the exact preparation command for the user's OS without running it, and (3) proceed with the best valid note this machine can produce, flagging what is missing (`frames: no`, "audio unread: prepare faster-whisper to unlock"). If no valid note can be produced, stop and say the request was not completed. Never claim successful setup or successful watching merely because a stub exists.
 
-**Bundled scripts.** Call them as `<python> "${CLAUDE_SKILL_DIR}/<script>.py"`, where `<python>` is the `python_cmd` recorded in the config (`python` is only a guess, and on Windows the working runtime is often `py -3` or an absolute path). A config written before this key existed won't have it, resolve it per [SETUP.md](SETUP.md) step 6 and write it back, once, rather than guessing every run. `${CLAUDE_SKILL_DIR}` resolves wherever the skill is installed, personal, project, or a marketplace cache, so never guess a path.
+**Write for someone who wasn't there.** The reader did not watch the video and does not already know the vocabulary, so the note fails if it can only be read by someone who did. The TL;DR and Watch verdict are the on-ramp: everyday language, no term the reader would not meet in ordinary conversation, and anything unavoidable glossed on the spot in a handful of words. Everything below them keeps exact names, flags, commands, and UI labels. Paraphrasing a runbook makes it unusable, which is a different failure and a worse one.
+
+Terms follow the vault's bar (argus-vault): one with a `topics/` page gets `[[linked]]` and is never re-explained here; one appearing in this video alone gets a one-line plain meaning inline, the first time it appears.
+
+**Bundled scripts.** Call them as `<python> "${CLAUDE_SKILL_DIR}/<script>.py"`, where `<python>` is the `python_cmd` recorded in the config (`python` is only a guess, and on Windows the working runtime is often `py -3` or an absolute path). A config written before this key existed will not have it, resolve it per [SETUP.md](SETUP.md) step 6 and write it back, once, rather than guessing every run. `${CLAUDE_SKILL_DIR}` resolves wherever the skill is installed, personal, project, or a marketplace cache, so never guess a path.
 
 **One working directory per item.** Everything downloaded or generated for an item lives in `<scratchpad>/argus/<source>-<id>/`: media, `transcript.txt`, `speech.txt`, `frames/`. Never write these to a shared directory, during a queue drain, three items are in flight at once, and a fixed name like `reel.mp4` means one worker reads another's video and quotes the wrong screen. Delete the directory once the note is written.
 
@@ -116,15 +120,27 @@ Delete any section that does not apply rather than leaving it empty. Deep links:
 
 ```markdown
 ## TL;DR
-(≤3 sentences)
+(≤3 sentences, everyday language — see "Write for someone who wasn't there")
 
 ## Watch verdict
 Verdict + the minute ranges that deserve eyeballs, or why none do.
+
+## Why this works           <!-- `try` and `watch` verdicts only -->
+What the moving parts are, what each phase of the runbook is actually for, and
+which steps are essential versus the author's taste. This is what lets a reader
+recover when their screen doesn't match the video. Skip it entirely for `skip`
+and `skim` — nobody implements those, so it would be pure cost.
 
 ## Prerequisites            <!-- tutorials: what the video assumes installed / signed up / known / on hand -->
 
 ## Runbook                  <!-- tutorials/workflows: reproducible WITHOUT watching -->
 1. Numbered steps with exact commands, config, quantities, and UI locations, quoted from frames.
+   **Capture what the video says to copy.** A step reading "paste this file" or
+   "use this prompt" is not reproducible if the thing itself lives elsewhere —
+   put the actual text in the note. Free when it was on screen or in the
+   transcript, since you already read it. When it sits behind an external link
+   (a gist, a repo), record the link and what it contains, and fetch the
+   contents only if the user asks — don't spend a download on it mid-run.
 
 ## Outdated flags
 Anything time-sensitive that may have rotted: stale syntax, renamed flags, deprecated models/APIs, old prices or versions, or "None spotted".
