@@ -40,24 +40,25 @@ Every watched item becomes a retrieval-grade note, not a summary:
 - a **watch-verdict**: `skip` / `skim` / `watch` / `try`, `watch` is rare and comes with exact minute ranges; workflows worth attempting land in a **Try Queue** with one nominated experiment per week
 - **cross-links**: topic index notes, and per-tool **dossier pages** that automatically accumulate what every video ever said about LangGraph, Firecrawl, whatever
 
-## Install, two commands, inside Claude Code
-
-```
-/plugin marketplace add newway1814/argus
-/plugin install argus@argus
-```
-
 ### One-time prerequisites
 
 Argus uses tools that **you prepare and own**. It does not create a private Python environment or install packages during a video run.
 
 | Capability | Prepare once |
 |---|---|
-| Core video fetching and note writing | Claude Code, Python 3.9+, `yt-dlp`, and Node |
+| Core video fetching and note writing | Claude Code, Python 3.9+, and `yt-dlp` |
+| More reliable YouTube fetching | Node, recommended; Argus can attempt fetching without it |
 | On-screen frame reading | `ffmpeg` and `ffprobe` |
 | Reels and caption-less videos | `faster-whisper` in the Python environment Argus will use |
 
 These tools are checked before their capability is used. If an optional tool is missing, Argus names what is unavailable and produces an honest degraded note where possible.
+
+## Install, two commands, inside Claude Code
+
+```
+/plugin marketplace add newway1814/argus
+/plugin install argus@argus
+```
 
 Then paste any link:
 

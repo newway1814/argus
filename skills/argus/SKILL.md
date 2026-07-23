@@ -1,7 +1,7 @@
 ---
 name: argus
 description: Watch a YouTube video, Instagram reel, Short, or other video URL, transcript, frames, and audio, and file what it teaches into the watch-vault. Use when the user shares a video/reel URL to watch/process/take notes on, or asks to drain the watch queue.
-compatibility: Requires Claude Code, Python 3.9+, yt-dlp, and Node. Frame extraction requires ffmpeg and ffprobe. Local transcription requires faster-whisper. Users prepare these prerequisites; Argus does not install them.
+compatibility: Requires Claude Code, Python 3.9+, and yt-dlp. Node is recommended for reliable YouTube fetching. Frame extraction requires ffmpeg and ffprobe. Local transcription requires faster-whisper. Users prepare these prerequisites; Argus does not install them.
 allowed-tools: Bash(python "${CLAUDE_SKILL_DIR}/"*), Bash(python3 "${CLAUDE_SKILL_DIR}/"*), Bash(py -3 "${CLAUDE_SKILL_DIR}/"*)
 ---
 
