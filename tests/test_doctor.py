@@ -91,19 +91,17 @@ class DoctorCliTests(unittest.TestCase):
     def secure_config(self, path):
         if os.name == "nt":
             user = os.environ["USERNAME"]
-            subprocess.run(
-                [
-                    "icacls",
-                    str(path),
-                    "/reset",
-                    "/inheritance:r",
-                    "/grant:r",
-                    f"{user}:F",
-                ],
-                text=True,
-                capture_output=True,
-                check=True,
-            )
+            for arguments in (
+                ["/reset"],
+                ["/inheritance:r"],
+                ["/grant:r", f"{user}:F"],
+            ):
+                subprocess.run(
+                    ["icacls", str(path), *arguments],
+                    text=True,
+                    capture_output=True,
+                    check=True,
+                )
         else:
             path.chmod(0o600)
 
@@ -544,8 +542,9 @@ class DoctorCliTests(unittest.TestCase):
                 "S-1-1-0|Read|Allow",
             )
         command = (
-            f'icacls "{self.config}" /reset /inheritance:r '
-            '/grant:r "%USERNAME%:F"'
+            f'icacls "{self.config}" /reset; '
+            f'icacls "{self.config}" /inheritance:r; '
+            f'icacls "{self.config}" /grant:r "${{env:USERNAME}}:F"'
         )
 
         result = self.run_doctor("windows")

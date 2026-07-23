@@ -345,8 +345,9 @@ def config_preparation_command(path, platform, reason):
         )
     if platform == "windows":
         return (
-            f'icacls "{path}" /reset /inheritance:r '
-            '/grant:r "%USERNAME%:F"'
+            f'icacls "{path}" /reset; '
+            f'icacls "{path}" /inheritance:r; '
+            f'icacls "{path}" /grant:r "${{env:USERNAME}}:F"'
         )
     return f'chmod 600 "{path}"'
 
