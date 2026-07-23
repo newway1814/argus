@@ -26,7 +26,12 @@ Reel or Short (instagram.com/reel, /shorts/)? Follow [REELS.md](REELS.md). Regul
    yt-dlp --js-runtimes node --skip-download --print "%(title)s | %(channel)s | %(upload_date)s | %(duration_string)s" <url>
    ```
    - No English subs? Run `--list-subs` and fetch the video's original language instead.
-   - No captions in any language? Listen instead of stubbing: `yt-dlp --js-runtimes node -f bestaudio -x --audio-format m4a -o "%(id)s.%(ext)s" <url>`, then `python "<this skill's folder>/transcribe_audio.py" <id>.m4a transcript.txt` (faster-whisper installs on first use per SETUP.md; local, no upload). Only if transcription is impossible on this machine: write a stub note (metadata, `watch-verdict: watch`, body: "No captions and no local transcription — needs eyeballs"), add a digest line saying so, ledger it, and stop.
+   - No captions in any language? Listen instead of stubbing — grab the *smallest* stream (whisper resamples to 16 kHz; quality is irrelevant, and platforms without audio-only streams, like X, would otherwise force a full-quality video download over throttled HLS):
+   ```
+   yt-dlp --js-runtimes node -f "bestaudio/worst[ext=mp4]/worst" --concurrent-fragments 8 -o "%(id)s.%(ext)s" <url>
+   python "<this skill's folder>/transcribe_audio.py" <downloaded file> transcript.txt
+   ```
+   (faster-whisper installs on first use per SETUP.md; local, no upload; it reads video containers directly — no extraction step). A download crawling under ~50 KB/s after 2 minutes is throttled: kill it and retry the next format in the chain rather than waiting. Only if transcription is impossible on this machine: write a stub note (metadata, `watch-verdict: watch`, body: "No captions and no local transcription — needs eyeballs"), add a digest line saying so, ledger it, and stop.
    - Collapse the rolling SRT before reading — raw auto-captions repeat every line ~3×:
    ```
    python "<this skill's folder>/clean_transcript.py" <id>.en.srt transcript.txt
