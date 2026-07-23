@@ -171,8 +171,20 @@ class DoctorCliTests(unittest.TestCase):
         python = self.prepare_machine()
 
         result = self.run_doctor()
+        acl_diagnostics = ""
+        if os.name == "nt":
+            acl_diagnostics = subprocess.run(
+                ["icacls", str(self.config)],
+                text=True,
+                capture_output=True,
+                check=False,
+            ).stdout
 
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            result.returncode,
+            0,
+            result.stdout + result.stderr + acl_diagnostics,
+        )
         self.assertIn(f"configured: {python}", result.stdout)
         self.assertIn(f"resolved: {python}", result.stdout)
         self.assertIn("captions: ready", result.stdout)
