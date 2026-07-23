@@ -18,8 +18,9 @@ try:
     from faster_whisper import WhisperModel
 except ImportError:
     sys.exit("transcribe_audio: faster-whisper is not installed. "
-             "Try: pipx install faster-whisper / pip install --user faster-whisper. "
-             "Without it, write the note from captions and mark the audio unread.")
+             "Prepare the Python environment recorded in argus.config.json "
+             "with faster-whisper, then re-run. Argus does not install packages "
+             "during a video run; the model stays local.")
 
 
 def load(device="cpu"):
@@ -62,7 +63,7 @@ if __name__ == "__main__":
     lines = [f"[{int(s.start) // 60}:{int(s.start) % 60:02d}] {s.text.strip()}"
              for s in transcribe(media)]
     if not lines:
-        sys.exit(f"transcribe_audio: no speech found in {media.name} — "
+        sys.exit(f"transcribe_audio: no speech found in {media.name}, "
                  "treat as silent, not as a failed read")
 
     body = "\n".join(lines)
