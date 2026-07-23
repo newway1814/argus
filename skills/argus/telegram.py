@@ -36,7 +36,7 @@ from note_writer import identity_for  # noqa: E402  (same folder, shared identit
 
 CONFIG = Path.home() / ".claude" / "argus.config.json"
 URLS = re.compile(r"https?://\S+")
-POLL_SECONDS = 120
+POLL_SECONDS = 300   # the code reaches the user through an agent turn; 2 minutes is not enough
 
 
 def load():
@@ -161,29 +161,37 @@ def cmd_fetch(cfg):
 
 def cmd_pair(cfg):
     code = f"{random.randint(100000, 999999)}"
-    print(f"Send this code to the bot as a message: {code}")
-    print(f"Waiting up to {POLL_SECONDS}s...")
+    print(f"Send this code to the bot as a message: {code}", flush=True)
+    print(f"Waiting up to {POLL_SECONDS}s...", flush=True)
     deadline = time.time() + POLL_SECONDS
     offset = cfg.get("telegram_offset", 0)
+    seen = {}   # update_id -> record, buffered until we know whose they are
     while time.time() < deadline:
-        res = call(cfg, "getUpdates", {"offset": offset + 1, "timeout": 20}, timeout=40)
+        res = call(cfg, "getUpdates", {"offset": offset + 1, "timeout": 10}, timeout=30)
         updates = res.get("result", [])
-        # Anything shared before pairing completes is still kept, not dropped.
+        # The offset deliberately does not move while pairing is unresolved:
+        # advancing it is what tells Telegram to forget these updates, and a
+        # pairing that times out must not take the user's pending shares with it.
         records, high = harvest(cfg, updates, owner_only=False)
-        if high > offset:
-            offset = high
+        for rec in records:
+            seen[rec["update_id"]] = rec
         for upd in updates:
             msg = upd.get("message") or {}
             if code in (msg.get("text") or ""):
-                cfg["telegram_owner_id"] = (msg.get("from") or {}).get("id")
-                cfg["telegram_offset"] = offset
+                owner = (msg.get("from") or {}).get("id")
+                mine = [r for r in seen.values() if r["from_id"] == owner]
+                if cfg.get("vault_path") and mine:
+                    append_durable(inbox_path(cfg), mine)   # durable before the offset moves
+                cfg["telegram_owner_id"] = owner
+                cfg["telegram_offset"] = high
                 save(cfg)
-                if cfg.get("vault_path"):
-                    append_durable(inbox_path(cfg),
-                                   [r for r in records if r["from_id"] == cfg["telegram_owner_id"]])
-                print(f"paired: owner id {cfg['telegram_owner_id']} — only this account is read")
+                print(f"paired: owner id {owner}. Only this account is read.", flush=True)
+                if mine:
+                    print(f"kept {len(mine)} shared link(s) already waiting in the bot", flush=True)
                 return
-    sys.exit("telegram: no code received in time — nothing was paired, run pair again")
+        time.sleep(3)
+    sys.exit("telegram: no code received in time. Nothing was paired and nothing was "
+             "consumed; the queue is untouched. Run pair again.")
 
 
 def cmd_send(cfg, file):
