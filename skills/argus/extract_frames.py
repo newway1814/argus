@@ -20,10 +20,11 @@ Ends by reporting gaps over 60s — including the head gap before the first kept
 frame and the tail gap after the last — for transcript-aware still-filling.
 
 Usage:
-  extract_frames.py <video> <out_dir> [--max 80] [--min 6] [--clean]
-  extract_frames.py <video> <out_dir> --stills 250,270,290
+  extract_frames.py <video> <out_dir> [--start SEC] [--end SEC] [--max 80] [--min 6] [--clean]
+  extract_frames.py <video> <out_dir> --start 240 --end 480 --stills 250,270,290
 """
 import argparse
+import math
 import re
 import shutil
 import subprocess
@@ -64,13 +65,46 @@ def duration_of(video):
     except ValueError:
         raise ExtractError(f"ffprobe reported no duration for {video.name} — "
                            "the download is probably truncated; refetch it")
-    if secs <= 0:
+    if not math.isfinite(secs) or secs <= 0:
         raise ExtractError(f"{video.name} reports a duration of {secs}s — refetch it")
     return secs
 
 
+def timestamp_origin_of(video):
+    p = run([
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=start_time",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(video),
+    ])
+    raw = p.stdout.strip()
+    if not raw or raw == "N/A":
+        return 0.0
+    try:
+        origin = float(raw)
+    except ValueError:
+        raise ExtractError(
+            f"ffprobe reported an invalid timestamp origin for {video.name}"
+        )
+    if not math.isfinite(origin):
+        raise ExtractError(
+            f"ffprobe reported an invalid timestamp origin for {video.name}"
+        )
+    return origin
+
+
 def name_for(secs):
-    return f"frame_{int(secs) // 60}m{int(secs) % 60:02d}s.jpg"
+    whole = int(secs)
+    millis = round((secs - whole) * 1000)
+    if millis == 1000:
+        whole += 1
+        millis = 0
+    suffix = f".{millis:03d}" if millis else ""
+    return f"frame_{whole // 60}m{whole % 60:02d}{suffix}s.jpg"
 
 
 def fmt(secs):
@@ -90,12 +124,15 @@ def grab(video, secs, out_dir, duration):
     return dest
 
 
-def candidates(video, tmp):
+def candidates(video, tmp, start, end, timestamp_origin):
     """One decode, metadata only: every frame past FLOOR, with pts_time and score."""
     # cwd=tmp keeps the filtergraph's file= free of drive-letter colons (Windows).
     meta = tmp / "scores.txt"
-    run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-i", str(video.resolve()),
-         "-an", "-vf", f"select='gt(scene,{FLOOR})',metadata=print:file=scores.txt",
+    run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-copyts",
+         "-ss", f"{start:.3f}", "-t", f"{end - start:.3f}",
+         "-i", str(video.resolve()), "-an",
+         "-vf", f"select='gt(scene,{FLOOR})',"
+         "metadata=print:file=scores.txt",
          "-f", "null", "-"], cwd=tmp)
     if not meta.exists():
         return []
@@ -103,7 +140,7 @@ def candidates(video, tmp):
     for line in meta.read_text(encoding="utf-8", errors="replace").splitlines():
         m = re.match(r"frame:\d+\s+pts:\S+\s+pts_time:([\d.]+)", line)
         if m:
-            pts = float(m.group(1))
+            pts = float(m.group(1)) - timestamp_origin
             continue
         m = re.search(r"lavfi\.scene_score=([\d.]+)", line)
         if m and pts is not None:
@@ -141,11 +178,26 @@ def select_frames(cands, budget):
     return times
 
 
-def report_gaps(kept, duration):
-    edges = [0.0] + sorted(kept) + [duration]
+def report_gaps(kept, start, end):
+    edges = [start] + sorted(kept) + [end]
     for a, b in zip(edges, edges[1:]):
         if b - a > GAP_REPORT:
             print(f"gap {fmt(a)} -> {fmt(b)} ({int(b - a)}s)")
+
+
+def window_bounds(start, end, duration):
+    start = 0.0 if start is None else start
+    end = duration if end is None else end
+    if not math.isfinite(start) or not math.isfinite(end):
+        raise ExtractError("window start and end must be finite numbers")
+    if start < 0:
+        raise ExtractError(f"window start must be nonnegative, got {start}")
+    if end <= start:
+        raise ExtractError(f"window end must be greater than start, got {start} -> {end}")
+    if end > duration:
+        raise ExtractError(
+            f"window end {fmt(end)} exceeds {fmt(duration)} source duration")
+    return start, end
 
 
 def main():
@@ -154,6 +206,8 @@ def main():
     ap.add_argument("out_dir")
     ap.add_argument("--max", type=int, default=80, dest="budget")
     ap.add_argument("--min", type=int, default=6, dest="floor_count")
+    ap.add_argument("--start", type=float, help="absolute source second where processing begins")
+    ap.add_argument("--end", type=float, help="absolute source second where processing stops")
     ap.add_argument("--stills", help="comma-separated seconds; grab those frames and exit")
     ap.add_argument("--clean", action="store_true",
                     help="delete frames already in out_dir instead of refusing")
@@ -162,17 +216,27 @@ def main():
     video, out_dir = Path(args.video), Path(args.out_dir)
     if not video.is_file():
         raise ExtractError(f"not found: {video}")
-    out_dir.mkdir(parents=True, exist_ok=True)
     duration = duration_of(video)
+    timestamp_origin = timestamp_origin_of(video)
+    start, end = window_bounds(args.start, args.end, duration)
 
     # --stills fills gaps in an existing set, so it appends by design.
     if args.stills:
-        wanted = [int(float(s)) for s in args.stills.split(",") if s.strip()]
+        wanted = [float(s) for s in args.stills.split(",") if s.strip()]
+        if not all(math.isfinite(secs) for secs in wanted):
+            raise ExtractError("still timestamps must be finite numbers")
+        outside = [secs for secs in wanted if not start <= secs < end]
+        if outside:
+            raise ExtractError(
+                f"stills must stay inside {fmt(start)} -> {fmt(end)}; "
+                f"outside: {', '.join(fmt(secs) for secs in outside)}")
+        out_dir.mkdir(parents=True, exist_ok=True)
         for s in wanted:
             grab(video, s, out_dir, duration)
         print(f"stills: {len(wanted)} written to {out_dir}")
         return
 
+    out_dir.mkdir(parents=True, exist_ok=True)
     stale = sorted(out_dir.glob("frame_*.jpg"))
     if stale and not args.clean:
         raise ExtractError(
@@ -186,7 +250,7 @@ def main():
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
     try:
-        cands = candidates(video, tmp)
+        cands = candidates(video, tmp, start, end, timestamp_origin)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -194,15 +258,25 @@ def main():
     if len(kept) >= args.floor_count:
         mode = "scene-scored"
     else:
-        n = max(FALLBACK_MIN, min(FALLBACK_CAP, int(duration // FALLBACK_SPACING) or FALLBACK_MIN))
-        kept = sorted({int(duration * j / n) for j in range(n)})
-        mode = f"even-spaced fallback (~1 per {int(duration / max(len(kept), 1))}s)"
+        window_duration = end - start
+        n = max(
+            FALLBACK_MIN,
+            min(FALLBACK_CAP, int(window_duration // FALLBACK_SPACING) or FALLBACK_MIN),
+        )
+        kept = [start + window_duration * j / n for j in range(n)]
+        mode = (
+            f"even-spaced fallback "
+            f"(~1 per {int(window_duration / max(len(kept), 1))}s)"
+        )
 
     for secs in kept:
         grab(video, secs, out_dir, duration)
 
-    print(f"kept {len(kept)} frames ({mode}) of {fmt(duration)} -> {out_dir}")
-    report_gaps(kept, duration)
+    print(
+        f"kept {len(kept)} frames ({mode}) in "
+        f"{fmt(start)} -> {fmt(end)} of {fmt(duration)} -> {out_dir}"
+    )
+    report_gaps(kept, start, end)
 
 
 if __name__ == "__main__":
