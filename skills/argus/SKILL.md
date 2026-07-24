@@ -55,10 +55,15 @@ Terms follow the vault's bar (argus-vault): one with a `topics/` page gets `[[li
    <python> "${CLAUDE_SKILL_DIR}/transcribe_audio.py" <downloaded file> transcript.txt
    ```
    (faster-whisper installs on first use per SETUP.md; local, no upload; it reads video containers directly — no extraction step). A download crawling under ~50 KB/s after 2 minutes is throttled: kill it and retry the next format in the chain rather than waiting. Only if transcription is impossible on this machine: write a stub note (metadata, `watch-verdict: watch`, body: "No captions and no local transcription — needs eyeballs"), add a digest line saying so, ledger it, and stop.
-   - Collapse the rolling captions before reading — raw auto-captions repeat every line ~3×. Pass the bare video id, not a filename: the script finds whichever language suffix yt-dlp actually wrote (`.en`, `.en-orig`, `.en-US`, …) and reads VTT or SRT either way, so no ffmpeg is needed to get a transcript.
+   - Collapse the rolling captions before reading. Raw auto-captions repeat every line roughly 3 times. Pass the bare video id, not a filename: the script finds whichever language suffix yt-dlp actually wrote (`.en`, `.en-orig`, `.en-US`, and others) and reads VTT or SRT either way, so no ffmpeg is needed to get a transcript.
    ```
    <python> "${CLAUDE_SKILL_DIR}/clean_transcript.py" <id> transcript.txt
    ```
+   For a selected chapter or custom window, pass its absolute source seconds. The output keeps those original timestamps:
+   ```
+   <python> "${CLAUDE_SKILL_DIR}/clean_transcript.py" <id> transcript-<chapter>.txt --start <start> --end <end> --duration <source-duration>
+   ```
+   Use the duration reported by step 2. Download captions once, then run this command once per selected chapter against the same caption file. Put every chapter result and the frames from its own `frames-<chapter>/` directory into the one video note described in step 6. Never trim or re-zero the media or captions.
    It exits non-zero if the file parses to nothing — that is a **no-captions** result, so fall through to the audio path above; never treat it as a quiet video.
    Read `transcript.txt`. Done when you can state the video's type (tutorial | news | explainer | opinion | workflow) and a 3-sentence TL;DR.
 4. **Tier decision.** Run the frame pass if the type is tutorial/demo, the transcript points at the screen ("as you can see", "click here", "this code", "paste this"), or `--frames` was passed. Two exits to Tier 1 only: a talking head with nothing on screen, or **duration over 60 minutes** (record which in the note; `--frames` overrides the length cap). Frames for a chosen chapter of a long video are fine — pass its time window to the frame script rather than the whole file.
