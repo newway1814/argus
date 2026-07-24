@@ -9,19 +9,22 @@ yt-dlp's language suffix (`.en`, `.en-orig`, `.en-US`, `.en-GB`, ...).
 
 Exits non-zero when nothing parses — an empty transcript must never look like success.
 
+Adjacent cues whose token edges overlap are buffered into one passage. Matching
+is local to that active passage and expires after a real time gap, so a phrase
+spoken again later is preserved.
+
 Usage:
   clean_transcript.py <captions.vtt|captions.srt|<video id>> [out.txt]
 """
 import re
 import sys
-from collections import deque
+from html import unescape
 from pathlib import Path
 
-TIMING = re.compile(r"(\d+):(\d{2}):(\d{2})[.,](\d+)\s*-->")
+STAMP = r"(\d+):(\d{2}):(\d{2})[.,](\d+)"
+TIMING = re.compile(rf"{STAMP}\s*-->\s*{STAMP}")
 TAGS = re.compile(r"<[^>]*>")   # VTT karaoke/styling: <c>, </c>, <00:00:01.500>, <i>
-ENTITIES = {"&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">",
-            "&#39;": "'", "&quot;": '"'}
-RECENT = 8                      # rolling-caption dedup window, in emitted lines
+ROLLING_GAP = 2.0
 
 
 def resolve(arg):
@@ -40,14 +43,37 @@ def resolve(arg):
 
 def clean(line):
     line = TAGS.sub("", line)
-    for entity, char in ENTITIES.items():
-        line = line.replace(entity, char)
+    line = unescape(line)
     return " ".join(line.split())
+
+
+def seconds(parts):
+    hours, minutes, whole, fraction = parts
+    return (
+        int(hours) * 3600
+        + int(minutes) * 60
+        + int(whole)
+        + float(f"0.{fraction}")
+    )
+
+
+def token_key(token):
+    return token.casefold().strip(".,!?;:")
+
+
+def overlap_size(existing, incoming):
+    existing_keys = [token_key(token) for token in existing]
+    incoming_keys = [token_key(token) for token in incoming]
+    limit = min(len(existing_keys), len(incoming_keys))
+    for size in range(limit, 0, -1):
+        if existing_keys[-size:] == incoming_keys[:size]:
+            return size
+    return 0
 
 
 def parse(path):
     text = path.read_text(encoding="utf-8", errors="replace")
-    out, recent = [], deque(maxlen=RECENT)
+    cues = []
     for block in re.split(r"\n\s*\n", text.strip()):
         lines = [l for l in block.splitlines() if l.strip()]
         # The timing line may be preceded by an SRT index or a VTT cue id, or by
@@ -55,15 +81,34 @@ def parse(path):
         idx = next((i for i, l in enumerate(lines) if TIMING.search(l)), None)
         if idx is None:
             continue
-        h, m, s, _ = TIMING.search(lines[idx]).groups()
-        new = []
-        for raw in lines[idx + 1:]:
-            spoken = clean(raw)
-            if spoken and spoken not in recent:
-                new.append(spoken)
-                recent.append(spoken)
-        if new:
-            out.append((int(h) * 3600 + int(m) * 60 + int(s), " ".join(new)))
+        match = TIMING.search(lines[idx])
+        start = seconds(match.groups()[:4])
+        end = seconds(match.groups()[4:])
+        spoken = clean(" ".join(lines[idx + 1:]))
+        if spoken:
+            cues.append((start, end, spoken.split()))
+
+    out = []
+    current_start = None
+    current_end = None
+    current_tokens = []
+    for start, end, tokens in cues:
+        overlap = 0
+        if current_tokens and start - current_end <= ROLLING_GAP:
+            overlap = overlap_size(current_tokens, tokens)
+        if current_tokens and overlap == 0:
+            out.append((current_start, " ".join(current_tokens)))
+            current_start = None
+            current_end = None
+            current_tokens = []
+        if not current_tokens:
+            current_start = start
+            current_tokens = list(tokens)
+        else:
+            current_tokens.extend(tokens[overlap:])
+        current_end = max(end, current_end or end)
+    if current_tokens:
+        out.append((current_start, " ".join(current_tokens)))
     return out
 
 
@@ -78,7 +123,10 @@ if __name__ == "__main__":
         sys.exit(f"clean_transcript: parsed 0 caption lines from {src.name}. "
                  f"Treat this as no captions (fall through to audio), not as an empty video.")
 
-    body = "\n".join(f"[{secs // 60}:{secs % 60:02d}] {t}" for secs, t in rows)
+    body = "\n".join(
+        f"[{int(secs) // 60}:{int(secs) % 60:02d}] {text}"
+        for secs, text in rows
+    )
     if len(sys.argv) > 2:
         Path(sys.argv[2]).write_text(body, encoding="utf-8")
         print(f"clean_transcript: {len(rows)} lines -> {sys.argv[2]}", file=sys.stderr)
