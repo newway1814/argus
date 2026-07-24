@@ -11,7 +11,9 @@ Exits non-zero when nothing parses — an empty transcript must never look like 
 
 Usage:
   clean_transcript.py <captions.vtt|captions.srt|<video id>> [out.txt]
+                      [--start SEC] [--end SEC]
 """
+import argparse
 import re
 import sys
 from collections import deque
@@ -45,7 +47,7 @@ def clean(line):
     return " ".join(line.split())
 
 
-def parse(path):
+def parse(path, start=0.0, end=None):
     text = path.read_text(encoding="utf-8", errors="replace")
     out, recent = [], deque(maxlen=RECENT)
     for block in re.split(r"\n\s*\n", text.strip()):
@@ -56,6 +58,9 @@ def parse(path):
         if idx is None:
             continue
         h, m, s, _ = TIMING.search(lines[idx]).groups()
+        secs = int(h) * 3600 + int(m) * 60 + int(s)
+        if secs < start or (end is not None and secs >= end):
+            continue
         new = []
         for raw in lines[idx + 1:]:
             spoken = clean(raw)
@@ -63,24 +68,39 @@ def parse(path):
                 new.append(spoken)
                 recent.append(spoken)
         if new:
-            out.append((int(h) * 3600 + int(m) * 60 + int(s), " ".join(new)))
+            out.append((secs, " ".join(new)))
     return out
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        sys.exit(__doc__)
-    src = resolve(sys.argv[1])
+    ap = argparse.ArgumentParser()
+    ap.add_argument("captions")
+    ap.add_argument("output", nargs="?")
+    ap.add_argument("--start", type=float, default=0.0)
+    ap.add_argument("--end", type=float)
+    args = ap.parse_args()
+    if args.start < 0:
+        sys.exit(f"clean_transcript: window start must be nonnegative, got {args.start}")
+    if args.end is not None and args.end <= args.start:
+        sys.exit(
+            f"clean_transcript: window end must be greater than start, "
+            f"got {args.start} -> {args.end}"
+        )
+
+    src = resolve(args.captions)
     print(f"clean_transcript: reading {src.name}", file=sys.stderr)
 
-    rows = parse(src)
+    rows = parse(src, args.start, args.end)
     if not rows:
-        sys.exit(f"clean_transcript: parsed 0 caption lines from {src.name}. "
-                 f"Treat this as no captions (fall through to audio), not as an empty video.")
+        sys.exit(
+            f"clean_transcript: parsed 0 caption lines from {src.name} "
+            f"inside the selected window. Treat this as no captions "
+            f"(fall through to audio), not as an empty video."
+        )
 
     body = "\n".join(f"[{secs // 60}:{secs % 60:02d}] {t}" for secs, t in rows)
-    if len(sys.argv) > 2:
-        Path(sys.argv[2]).write_text(body, encoding="utf-8")
-        print(f"clean_transcript: {len(rows)} lines -> {sys.argv[2]}", file=sys.stderr)
+    if args.output:
+        Path(args.output).write_text(body, encoding="utf-8")
+        print(f"clean_transcript: {len(rows)} lines -> {args.output}", file=sys.stderr)
     else:
         print(body)
