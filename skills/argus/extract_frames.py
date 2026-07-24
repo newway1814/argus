@@ -24,6 +24,7 @@ Usage:
   extract_frames.py <video> <out_dir> --start 240 --end 480 --stills 250,270,290
 """
 import argparse
+import math
 import re
 import shutil
 import subprocess
@@ -64,7 +65,7 @@ def duration_of(video):
     except ValueError:
         raise ExtractError(f"ffprobe reported no duration for {video.name} — "
                            "the download is probably truncated; refetch it")
-    if secs <= 0:
+    if not math.isfinite(secs) or secs <= 0:
         raise ExtractError(f"{video.name} reports a duration of {secs}s — refetch it")
     return secs
 
@@ -160,6 +161,8 @@ def report_gaps(kept, start, end):
 def window_bounds(start, end, duration):
     start = 0.0 if start is None else start
     end = duration if end is None else end
+    if not math.isfinite(start) or not math.isfinite(end):
+        raise ExtractError("window start and end must be finite numbers")
     if start < 0:
         raise ExtractError(f"window start must be nonnegative, got {start}")
     if end <= start:
@@ -192,6 +195,8 @@ def main():
     # --stills fills gaps in an existing set, so it appends by design.
     if args.stills:
         wanted = [float(s) for s in args.stills.split(",") if s.strip()]
+        if not all(math.isfinite(secs) for secs in wanted):
+            raise ExtractError("still timestamps must be finite numbers")
         outside = [secs for secs in wanted if not start <= secs < end]
         if outside:
             raise ExtractError(
