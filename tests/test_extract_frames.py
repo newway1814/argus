@@ -1,4 +1,5 @@
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -31,13 +32,25 @@ class ExtractFramesCliTests(unittest.TestCase):
             path.chmod(0o755)
         return path
 
-    def test_successful_ffmpeg_without_a_frame_is_reported_as_failure(self):
-        self.executable("ffprobe", "echo 120")
-        self.executable("ffmpeg", "exit /b 0" if os.name == "nt" else "exit 0")
+    def python_executable(self, name, source):
+        implementation = self.bin / f"{name}_implementation.py"
+        implementation.write_text(source, encoding="utf-8")
+        if os.name == "nt":
+            body = (
+                subprocess.list2cmdline([sys.executable, str(implementation)])
+                + " %*"
+            )
+        else:
+            body = (
+                f"exec {shlex.quote(sys.executable)} "
+                f"{shlex.quote(str(implementation))} \"$@\""
+            )
+        return self.executable(name, body)
+
+    def run_extract_frames(self):
         env = os.environ.copy()
         env["PATH"] = str(self.bin)
-
-        result = subprocess.run(
+        return subprocess.run(
             [
                 sys.executable,
                 str(EXTRACT_FRAMES),
@@ -50,10 +63,64 @@ class ExtractFramesCliTests(unittest.TestCase):
             check=False,
         )
 
+    def assert_failed_without_frames(self, result):
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("ffmpeg wrote no frame", result.stderr)
         self.assertNotIn("kept ", result.stdout)
-        self.assertEqual(list(self.out.glob("frame_*.jpg")), [])
+        valid_frames = [
+            frame
+            for frame in self.out.glob("frame_*.jpg")
+            if frame.stat().st_size > 0
+        ]
+        self.assertEqual(valid_frames, [])
+
+    def test_successful_ffmpeg_without_a_frame_is_reported_as_failure(self):
+        self.executable("ffprobe", "echo 120")
+        self.executable("ffmpeg", "exit /b 0" if os.name == "nt" else "exit 0")
+
+        result = self.run_extract_frames()
+
+        self.assert_failed_without_frames(result)
+        self.assertIn("ffmpeg wrote no frame", result.stderr)
+
+    def test_zero_byte_frame_is_reported_as_failure(self):
+        self.executable("ffprobe", "echo 120")
+        self.python_executable(
+            "ffmpeg",
+            "import sys\n"
+            "from pathlib import Path\n"
+            "destination = Path(sys.argv[-1])\n"
+            "if destination.suffix.lower() == '.jpg':\n"
+            "    destination.touch()\n",
+        )
+
+        result = self.run_extract_frames()
+
+        self.assert_failed_without_frames(result)
+        self.assertIn("ffmpeg wrote no frame", result.stderr)
+        zero_byte_frames = list(self.out.glob("frame_*.jpg"))
+        self.assertNotEqual(zero_byte_frames, [])
+        self.assertTrue(all(frame.stat().st_size == 0 for frame in zero_byte_frames))
+
+    def test_nonzero_ffprobe_exit_is_reported_as_failure(self):
+        if os.name == "nt":
+            ffprobe_body = "echo 120\r\nexit /b 7"
+        else:
+            ffprobe_body = "echo 120\nexit 7"
+        self.executable("ffprobe", ffprobe_body)
+
+        result = self.run_extract_frames()
+
+        self.assert_failed_without_frames(result)
+        self.assertIn("ffprobe failed (exit 7)", result.stderr)
+
+    def test_nonzero_ffmpeg_exit_is_reported_as_failure(self):
+        self.executable("ffprobe", "echo 120")
+        self.executable("ffmpeg", "exit /b 9" if os.name == "nt" else "exit 9")
+
+        result = self.run_extract_frames()
+
+        self.assert_failed_without_frames(result)
+        self.assertIn("ffmpeg failed (exit 9)", result.stderr)
 
 
 if __name__ == "__main__":
