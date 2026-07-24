@@ -72,6 +72,12 @@ class CaptionCleanupCliTests(unittest.TestCase):
             ),
         )
 
+    def test_one_word_cue_can_grow_into_a_rolling_caption(self):
+        result, body = self.clean("single_word_growth.vtt")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(body, "[0:00] Open the menu")
+
 
 if __name__ == "__main__":
     unittest.main()

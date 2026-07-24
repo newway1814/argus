@@ -102,7 +102,12 @@ def parse(path):
         if current_tokens and start < previous_end:
             overlap = overlap_size(current_tokens, tokens)
         rolling = overlap >= 2 or (
-            overlap > 0 and same_tokens(current_tokens, tokens)
+            overlap > 0
+            and (
+                same_tokens(current_tokens, tokens)
+                or overlap == len(current_tokens)
+                or overlap == len(tokens)
+            )
         )
         if current_tokens and not rolling:
             out.append((current_start, " ".join(current_tokens)))
