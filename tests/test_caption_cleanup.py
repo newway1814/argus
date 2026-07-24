@@ -58,6 +58,20 @@ class CaptionCleanupCliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(body, "[0:05] Open the menu & choose settings")
 
+    def test_one_word_collision_and_immediate_repeat_are_preserved(self):
+        result, body = self.clean("legitimate_adjacent_repetition.vtt")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            body,
+            (
+                "[0:00] we selected save\n"
+                "[0:01] save your work often\n"
+                "[0:04] Yes.\n"
+                "[0:05] Yes."
+            ),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

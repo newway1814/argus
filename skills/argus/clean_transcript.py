@@ -9,9 +9,9 @@ yt-dlp's language suffix (`.en`, `.en-orig`, `.en-US`, `.en-GB`, ...).
 
 Exits non-zero when nothing parses — an empty transcript must never look like success.
 
-Adjacent cues whose token edges overlap are buffered into one passage. Matching
-is local to that active passage and expires after a real time gap, so a phrase
-spoken again later is preserved.
+Temporally overlapping cues whose token edges share at least two words are
+buffered into one passage. Exact duplicates also collapse while their cue times
+overlap. Matching is local, so a phrase spoken again later is preserved.
 
 Usage:
   clean_transcript.py <captions.vtt|captions.srt|<video id>> [out.txt]
@@ -24,7 +24,6 @@ from pathlib import Path
 STAMP = r"(\d+):(\d{2}):(\d{2})[.,](\d+)"
 TIMING = re.compile(rf"{STAMP}\s*-->\s*{STAMP}")
 TAGS = re.compile(r"<[^>]*>")   # VTT karaoke/styling: <c>, </c>, <00:00:01.500>, <i>
-ROLLING_GAP = 2.0
 
 
 def resolve(arg):
@@ -71,6 +70,12 @@ def overlap_size(existing, incoming):
     return 0
 
 
+def same_tokens(left, right):
+    return [token_key(token) for token in left] == [
+        token_key(token) for token in right
+    ]
+
+
 def parse(path):
     text = path.read_text(encoding="utf-8", errors="replace")
     cues = []
@@ -90,23 +95,25 @@ def parse(path):
 
     out = []
     current_start = None
-    current_end = None
+    previous_end = None
     current_tokens = []
     for start, end, tokens in cues:
         overlap = 0
-        if current_tokens and start - current_end <= ROLLING_GAP:
+        if current_tokens and start < previous_end:
             overlap = overlap_size(current_tokens, tokens)
-        if current_tokens and overlap == 0:
+        rolling = overlap >= 2 or (
+            overlap > 0 and same_tokens(current_tokens, tokens)
+        )
+        if current_tokens and not rolling:
             out.append((current_start, " ".join(current_tokens)))
             current_start = None
-            current_end = None
             current_tokens = []
         if not current_tokens:
             current_start = start
             current_tokens = list(tokens)
         else:
             current_tokens.extend(tokens[overlap:])
-        current_end = max(end, current_end or end)
+        previous_end = end
     if current_tokens:
         out.append((current_start, " ".join(current_tokens)))
     return out
