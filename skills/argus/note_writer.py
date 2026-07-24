@@ -186,7 +186,8 @@ def destination(vault, meta, identity):
 def write_atomic(path, text):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".md.tmp")
-    tmp.write_text(text, encoding="utf-8", newline="\n")
+    with tmp.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
     os.replace(tmp, path)
 
 

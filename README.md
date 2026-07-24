@@ -61,6 +61,18 @@ Argus uses tools that **you prepare and own**. It does not create a private Pyth
 
 These tools are checked before their capability is used. If an optional tool is missing, Argus names what is unavailable and produces an honest degraded note where possible.
 
+### Tested platforms
+
+Every pull request runs the full offline suite on the minimum supported Python and the current tested Python release:
+
+| Operating system | Python 3.9 | Python 3.14 |
+|---|---:|---:|
+| macOS | Tested | Tested |
+| Ubuntu Linux | Tested | Tested |
+| Windows | Tested | Tested |
+
+The suite generates its own media and captions. It does not call YouTube, Instagram, Telegram, or another live content service. It covers URL identity, rolling captions, frame selection, gap reporting, chapter timestamps, note serialization, configuration validation, and explicit failure when media or prerequisites are missing.
+
 ## Install, two commands, inside Claude Code
 
 ```
