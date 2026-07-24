@@ -193,6 +193,23 @@ class TimeWindowCliTests(unittest.TestCase):
         self.assertNotIn("gap 0:00", result.stdout)
 
     @MEDIA_REQUIRED
+    def test_fractional_start_keeps_scene_candidate_on_source_clock(self):
+        result, output = self.run_frames(
+            "--start",
+            "50.5",
+            "--end",
+            "180",
+            "--min",
+            "1",
+            video=self.long_video,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        frame_names = sorted(path.name for path in output.glob("frame_*.jpg"))
+        self.assertIn("frame_1m40s.jpg", frame_names)
+        self.assertNotIn("frame_1m39.500s.jpg", frame_names)
+
+    @MEDIA_REQUIRED
     def test_invalid_frame_windows_fail_without_output(self):
         cases = [
             ("--start", "-1", "--end", "9"),

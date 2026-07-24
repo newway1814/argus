@@ -101,10 +101,10 @@ def candidates(video, tmp, start, end):
     """One decode, metadata only: every frame past FLOOR, with pts_time and score."""
     # cwd=tmp keeps the filtergraph's file= free of drive-letter colons (Windows).
     meta = tmp / "scores.txt"
-    run(["ffmpeg", "-hide_banner", "-loglevel", "error",
+    run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-copyts",
          "-ss", f"{start:.3f}", "-t", f"{end - start:.3f}",
          "-i", str(video.resolve()), "-an",
-         "-vf", f"setpts=PTS-STARTPTS,select='gt(scene,{FLOOR})',"
+         "-vf", f"select='gt(scene,{FLOOR})',"
          "metadata=print:file=scores.txt",
          "-f", "null", "-"], cwd=tmp)
     if not meta.exists():
@@ -113,7 +113,7 @@ def candidates(video, tmp, start, end):
     for line in meta.read_text(encoding="utf-8", errors="replace").splitlines():
         m = re.match(r"frame:\d+\s+pts:\S+\s+pts_time:([\d.]+)", line)
         if m:
-            pts = start + float(m.group(1))
+            pts = float(m.group(1))
             continue
         m = re.search(r"lavfi\.scene_score=([\d.]+)", line)
         if m and pts is not None:
