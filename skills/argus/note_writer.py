@@ -32,6 +32,7 @@ import sys
 import unicodedata
 from datetime import date
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 TYPES = ["tutorial", "news", "explainer", "opinion", "workflow"]
 VERDICTS = ["skip", "skim", "watch", "try"]
@@ -42,15 +43,55 @@ RESERVED = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)),
             *(f"lpt{i}" for i in range(1, 10))}
 MAX_NAME = 120          # filename length cap, generous room for a deep vault path
 
-YOUTUBE = re.compile(r"(?:youtu\.be/|youtube\.com/(?:watch\?v=|shorts/|live/|embed/))([\w-]{6,})")
 INSTAGRAM = re.compile(r"instagram\.com/(?:reel|reels|p|tv)/([\w-]+)")
+YOUTUBE_ID = re.compile(r"[A-Za-z0-9_-]{11}")
+YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"}
+SHORT_HOSTS = {"youtu.be", "www.youtu.be"}
+
+
+class IdentityError(ValueError):
+    """A recognized video platform URL that cannot identify one video."""
+
+
+def parsed_url(url):
+    candidate = url if "://" in url else f"https://{url}"
+    return urlparse(candidate)
+
+
+def youtube_identity(url):
+    parsed = parsed_url(url)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if host not in YOUTUBE_HOSTS | SHORT_HOSTS:
+        return None
+    if parsed.scheme not in {"http", "https"}:
+        raise IdentityError("invalid YouTube video URL: only http and https are supported")
+
+    segments = [segment for segment in parsed.path.split("/") if segment]
+    source = "youtube"
+    video_id = None
+
+    if host in SHORT_HOSTS:
+        if len(segments) == 1:
+            video_id = segments[0]
+    elif parsed.path.rstrip("/") == "/watch":
+        candidates = parse_qs(parsed.query, keep_blank_values=True).get("v", [])
+        if len(candidates) == 1:
+            video_id = candidates[0]
+    elif len(segments) == 2 and segments[0] in {"shorts", "live", "embed"}:
+        video_id = segments[1]
+        if segments[0] == "shorts":
+            source = "youtube-shorts"
+
+    if video_id is None or not YOUTUBE_ID.fullmatch(video_id):
+        raise IdentityError(f"invalid YouTube video URL: {url}")
+    return f"youtube:{video_id}", source
 
 
 def identity_for(url):
     """`<source>:<id>` — the item's one name, in the ledger and in frontmatter."""
-    m = YOUTUBE.search(url)
-    if m:
-        return f"youtube:{m.group(1)}", "youtube-shorts" if "/shorts/" in url else "youtube"
+    youtube = youtube_identity(url)
+    if youtube:
+        return youtube
     m = INSTAGRAM.search(url)
     if m:
         return f"instagram:{m.group(1)}", "instagram"
@@ -158,7 +199,10 @@ def main():
     args = ap.parse_args()
 
     if args.identity:
-        identity, source = identity_for(args.identity)
+        try:
+            identity, source = identity_for(args.identity)
+        except IdentityError as error:
+            sys.exit(f"note_writer: {error}")
         print(f"identity: {identity}")
         print(f"source: {source}")
         tmpl = link_template(identity, args.identity)
@@ -189,7 +233,10 @@ def main():
     if not vault.is_dir():
         sys.exit(f"note_writer: no vault at {vault}")
 
-    identity, source = identity_for(meta["url"])
+    try:
+        identity, source = identity_for(meta["url"])
+    except IdentityError as error:
+        sys.exit(f"note_writer: {error}")
     body = Path(args.body).read_text(encoding="utf-8")
     body = re.sub(r"\A---\n.*?\n---\n", "", body, flags=re.S)   # body only; we own the frontmatter
     dest = destination(vault, meta, identity)
