@@ -76,21 +76,19 @@ class TimeWindowCliTests(unittest.TestCase):
         for source in sources:
             command.extend(["-f", "lavfi", "-i", source])
         inputs = "".join(f"[{index}:v]" for index in range(len(sources)))
-        timing = f",setpts=PTS+{timestamp_offset}/TB" if timestamp_offset else ""
         command.extend(
             [
                 "-filter_complex",
-                (
-                    f"{inputs}concat=n={len(sources)}:v=1:a=0"
-                    f"{timing},format=yuv420p[v]"
-                ),
+                f"{inputs}concat=n={len(sources)}:v=1:a=0,format=yuv420p[v]",
                 "-map",
                 "[v]",
                 "-c:v",
                 "mpeg4",
-                path,
             ]
         )
+        if timestamp_offset:
+            command.extend(["-output_ts_offset", str(timestamp_offset)])
+        command.append(path)
         result = subprocess.run(
             command,
             text=True,

@@ -25,6 +25,7 @@ Usage:
 """
 import argparse
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -43,8 +44,24 @@ class ExtractError(Exception):
 
 
 def run(cmd, cwd=None):
+    executable = shutil.which(cmd[0])
+    if not executable:
+        raise ExtractError(
+            f"{cmd[0]} is not on PATH. Install ffmpeg "
+            "(winget install Gyan.FFmpeg / brew install ffmpeg / apt install ffmpeg), "
+            "or write the note transcript-only with frames: no")
+    resolved = [executable, *cmd[1:]]
+    if os.name == "nt" and Path(executable).suffix.lower() in {".cmd", ".bat"}:
+        command_line = subprocess.list2cmdline(resolved)
+        resolved = [
+            os.environ.get("COMSPEC", r"C:\Windows\System32\cmd.exe"),
+            "/d",
+            "/s",
+            "/c",
+            command_line,
+        ]
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+        p = subprocess.run(resolved, capture_output=True, text=True, encoding="utf-8",
                            errors="replace", cwd=cwd)
     except FileNotFoundError:
         raise ExtractError(
