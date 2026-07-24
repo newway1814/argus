@@ -60,17 +60,30 @@ class TimeWindowCliTests(unittest.TestCase):
                 "color=c=white:s=32x32:d=100:r=1",
             ],
         )
+        cls.offset_video = cls.root / "offset-scenes.mp4"
+        cls.make_video(
+            cls.offset_video,
+            [
+                "color=c=black:s=32x32:d=2:r=1",
+                "color=c=white:s=32x32:d=2:r=1",
+            ],
+            timestamp_offset=10,
+        )
 
     @classmethod
-    def make_video(cls, path, sources):
+    def make_video(cls, path, sources, timestamp_offset=0):
         command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y"]
         for source in sources:
             command.extend(["-f", "lavfi", "-i", source])
         inputs = "".join(f"[{index}:v]" for index in range(len(sources)))
+        timing = f",setpts=PTS+{timestamp_offset}/TB" if timestamp_offset else ""
         command.extend(
             [
                 "-filter_complex",
-                f"{inputs}concat=n={len(sources)}:v=1:a=0,format=yuv420p[v]",
+                (
+                    f"{inputs}concat=n={len(sources)}:v=1:a=0"
+                    f"{timing},format=yuv420p[v]"
+                ),
                 "-map",
                 "[v]",
                 "-c:v",
@@ -208,6 +221,23 @@ class TimeWindowCliTests(unittest.TestCase):
         frame_names = sorted(path.name for path in output.glob("frame_*.jpg"))
         self.assertIn("frame_1m40s.jpg", frame_names)
         self.assertNotIn("frame_1m39.500s.jpg", frame_names)
+
+    @MEDIA_REQUIRED
+    def test_nonzero_container_timestamp_is_normalized_to_viewer_time(self):
+        result, output = self.run_frames(
+            "--start",
+            "0.5",
+            "--end",
+            "4",
+            "--min",
+            "1",
+            video=self.offset_video,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        frame_names = sorted(path.name for path in output.glob("frame_*.jpg"))
+        self.assertIn("frame_0m02s.jpg", frame_names)
+        self.assertNotIn("frame_0m12s.jpg", frame_names)
 
     @MEDIA_REQUIRED
     def test_invalid_frame_windows_fail_without_output(self):

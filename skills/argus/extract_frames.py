@@ -70,6 +70,33 @@ def duration_of(video):
     return secs
 
 
+def timestamp_origin_of(video):
+    p = run([
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=start_time",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(video),
+    ])
+    raw = p.stdout.strip()
+    if not raw or raw == "N/A":
+        return 0.0
+    try:
+        origin = float(raw)
+    except ValueError:
+        raise ExtractError(
+            f"ffprobe reported an invalid timestamp origin for {video.name}"
+        )
+    if not math.isfinite(origin):
+        raise ExtractError(
+            f"ffprobe reported an invalid timestamp origin for {video.name}"
+        )
+    return origin
+
+
 def name_for(secs):
     whole = int(secs)
     millis = round((secs - whole) * 1000)
@@ -97,7 +124,7 @@ def grab(video, secs, out_dir, duration):
     return dest
 
 
-def candidates(video, tmp, start, end):
+def candidates(video, tmp, start, end, timestamp_origin):
     """One decode, metadata only: every frame past FLOOR, with pts_time and score."""
     # cwd=tmp keeps the filtergraph's file= free of drive-letter colons (Windows).
     meta = tmp / "scores.txt"
@@ -113,7 +140,7 @@ def candidates(video, tmp, start, end):
     for line in meta.read_text(encoding="utf-8", errors="replace").splitlines():
         m = re.match(r"frame:\d+\s+pts:\S+\s+pts_time:([\d.]+)", line)
         if m:
-            pts = float(m.group(1))
+            pts = float(m.group(1)) - timestamp_origin
             continue
         m = re.search(r"lavfi\.scene_score=([\d.]+)", line)
         if m and pts is not None:
@@ -190,6 +217,7 @@ def main():
     if not video.is_file():
         raise ExtractError(f"not found: {video}")
     duration = duration_of(video)
+    timestamp_origin = timestamp_origin_of(video)
     start, end = window_bounds(args.start, args.end, duration)
 
     # --stills fills gaps in an existing set, so it appends by design.
@@ -222,7 +250,7 @@ def main():
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
     try:
-        cands = candidates(video, tmp, start, end)
+        cands = candidates(video, tmp, start, end, timestamp_origin)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
