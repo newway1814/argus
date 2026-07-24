@@ -32,7 +32,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from note_writer import identity_for  # noqa: E402  (same folder, shared identity rule)
+from note_writer import IdentityError, identity_for  # noqa: E402
 
 CONFIG = Path.home() / ".claude" / "argus.config.json"
 URLS = re.compile(r"https?://\S+")
@@ -107,7 +107,10 @@ def harvest(cfg, updates, owner_only=True):
         text = " ".join(filter(None, [msg.get("text"), msg.get("caption")]))
         for url in URLS.findall(text):
             url = url.rstrip(".,)")
-            identity, _ = identity_for(url)
+            try:
+                identity, _ = identity_for(url)
+            except IdentityError:
+                continue
             records.append({
                 "update_id": upd.get("update_id"),
                 "received": msg.get("date"),
